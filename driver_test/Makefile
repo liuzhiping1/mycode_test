@@ -6,9 +6,9 @@ else
 KDIR := /opt/linux-3.4.y
 PWD:=$(shell pwd)  
 all:  
-    $(info "1st")  
-    make -C $(KDIR) M=$(PWD) modules  
-    gcc test.c -o beeptest  
+	$(info "1st")  
+	make -C $(KDIR) M=$(PWD) modules  
+	gcc test.c -o beeptest  
 clean:  
-    rm -f *.ko *.o *.symvers *.mod.c *.mod.o *.order  
+	rm -f *.ko *.o *.symvers *.mod.c *.mod.o *.order  
 endif  
