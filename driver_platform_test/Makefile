@@ -3,11 +3,11 @@ obj-m:=device.o driver.o
 $(info "2nd")  
 else  
 #KDIR := /lib/modules/$(shell uname -r)/build  
-KDIR := /home/fs/linux/linux-3.14-fs4412  
+KDIR := /opt/linux-3.4.y
 PWD:=$(shell pwd)  
 all:  
-    $(info "1st")  
-    make -C $(KDIR) M=$(PWD) modules  
+	$(info "1st")  
+	make -C $(KDIR) M=$(PWD) modules  
 clean:  
-    rm -f *.ko *.o *.symvers *.mod.c *.mod.o *.order  
+	rm -f *.ko *.o *.symvers *.mod.c *.mod.o *.order  
 endif  
