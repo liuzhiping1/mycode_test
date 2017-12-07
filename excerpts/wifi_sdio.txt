@@ -1,0 +1,483 @@
+http://blog.csdn.net/zqixiao_09/article/details/51105877   Linux 下wifi 驱动开发（三）—— SDIO接口WiFi驱动浅析
+
+SDIO-Wifi模块是基于SDIO接口的符合wifi无线网络标准的嵌入式模块，内置无线网络协议IEEE802.11协议栈以及TCP/IP协议栈，能够实现用户主平台数据通过SDIO口到无线网络之间的转换。SDIO具有传输数据快，兼容SD、MMC接口等特点。
+     对于SDIO接口的wifi，首先，它是一个sdio的卡的设备，然后具备了wifi的功能，所以，注册的时候还是先以sdio的卡的设备去注册的。然后检测到卡之后就要驱动他的wifi功能了，显然，他是用sdio的协议，通过发命令和数据来控制的。下面先简单回顾一下SDIO的相关知识：
+一、SDIO相关基础知识解析
+1、SDIO接口
+       SDIO 故名思义，就是 SD 的 I/O 接口（interface）的意思，不过这样解释可能还有点抽像。更具体的说明，SD 本来是记忆卡的标准，但是现在也可以把 SD 拿来插上一些外围接口使用，这样的技术便是 SDIO。
+       所以 SDIO 本身是一种相当单纯的技术，透过 SD 的 I/O 接脚来连接外部外围，并且透过 SD 上的 I/O 数据接位与这些外围传输数据，而且 SD 协会会员也推出很完整的 SDIO stack 驱动程序，使得 SDIO 外围（我们称为SDIO 卡）的开发与应用变得相当热门。
+       现在已经有非常多的手机或是手持装置都支持 SDIO 的功能（SD 标准原本就是针对 mobile device 而制定），而且许多 SDIO 外围也都被开发出来，让手机外接外围更加容易，并且开发上更有弹性（不需要内建外围）。目前常见的 SDIO 外围（SDIO 卡）有：
+· Wi-Fi card（无线网络卡） 
+· CMOS sensor card（照相模块） 
+· GPS card 
+· GSM/GPRS modem card 
+· Bluetooth card 
+        SDIO 的应用将是未来嵌入式系统最重要的接口技术之一，并且也会取代目前 GPIO 式的 SPI 接口。
+
+2、SDIO总线
+      SDIO总线 和 USB总线 类似，SDIO也有两端，其中一端是HOST端，另一端是device端。所有的通信都是由HOST端 发送 命令 开始的，Device端只要能解析命令，就可以相互通信。
+CLK信号:HOST给DEVICE的 时钟信号，每个时钟周期传输一个命令。
+CMD信号：双向 的信号，用于传送 命令 和 反应。
+DAT0-DAT3 信号:四条用于传送的数据线。
+VDD信号:电源信号。
+VSS1，VSS2:电源地信号。
+
+3、SDIO热插拔原理
+方法：设置一个 定时器检查 或 插拔中断检测
+硬件：假如GPG10（EINT18）用于SD卡检测
+GPG10 为高电平 即没有插入SD卡
+GPG10为低电平  即插入了SD卡
+
+4、SDIO命令
+      SDIO总线上都是HOST端发起请求，然后DEVICE端回应请求。sdio命令由6个字节组成。
+a -- Command:用于开始传输的命令，是由HOST端发往DEVICE端的。其中命令是通过CMD信号线传送的。
+b -- Response:回应是DEVICE返回的HOST的命令，作为Command的回应。也是通过CMD线传送的。
+c -- Data:数据是双向的传送的。可以设置为1线模式，也可以设置为4线模式。数据是通过DAT0-DAT3信号线传输的。
+      SDIO的每次操作都是由HOST在CMD线上发起一个CMD，对于有的CMD，DEVICE需要返回Response，有的则不需要。
+     对于读命令，首先HOST会向DEVICE发送命令，紧接着DEVICE会返回一个握手信号，此时，当HOST收到回应的握手信号后，会将数据放在4位的数据线上，在传送数据的同时会跟随着CRC校验码。当整个读传送完毕后，HOST会再次发送一个命令，通知DEVICE操作完毕，DEVICE同时会返回一个响应。
+    对于写命令，首先HOST会向DEVICE发送命令，紧接着DEVICE会返回一个握手信号，此时，当HOST收到回应的握手信号后，会将数据放在4位的数据线上，在传送数据的同时会跟随着CRC校验码。当整个写传送完毕后，HOST会再次发送一个命令，通知DEVICE操作完毕，DEVICE同时会返回一个响应。
+
+二、SDIO接口驱动
+        前面讲到，SDIO接口的wifi，首先，它是一个sdio的卡的设备，然后具备了wifi的功能，所以SDIO接口的WiFi驱动就是在wifi驱动外面套上了一个SDIO驱动的外壳，SDIO驱动仍然符合设备驱动的分层与分离思想：
+
+     设备驱动层（wifi 设备）
+                      |
+核心层（向上向下提供接口）
+                      |
+主机驱动层 （实现SDIO驱动）
+
+        下面先分析SDIO接口驱动的实现，看几个重要的数据结构（用于核心层与主机驱动层 的数据交换处理）。
+[ /include/linux/mmc/host.h ]
+struct mmc_host     用来描述卡控制器
+struct mmc_card     用来描述卡
+struct mmc_driver  用来描述 mmc 卡驱动
+struct sdio_func      用来描述 功能设备
+struct mmc_host_ops   用来描述卡控制器操作接口函数功能，用于从 主机控制器层向 core 层注册操作函数，从而将core 层与具体的主机控制器隔离。也就是说 core 要操作主机控制器，就用这个 ops 当中给的函数指针操作，不能直接调用具体主控制器的函数。
+      HOST层驱动分析在 前面的系列文章中 Linux SD卡驱动开发(二) —— SD 卡驱动分析HOST篇 有详细阐述，下面只简单回顾一下一些重要函数处理
+1、编写Host层驱动
+     这里参考的是S3C24XX的HOST驱动程序   /drivers/mmc/host/s3cmci.c 
+[cpp] view plain copy
+static struct platform_driver s3cmci_driver = {  
+     .driver  = {  
+         .name    = "s3c-sdi",  //名称和平台设备定义中的对应  
+         .owner   = THIS_MODULE,  
+         .pm  = s3cmci_pm_ops,  
+     },  
+     .id_table = s3cmci_driver_ids,  
+     .probe        = s3cmci_probe,  //平台设备探测接口函数  
+     .remove       = __devexit_p(s3cmci_remove),  
+     .shutdown = s3cmci_shutdown,  
+};  
+  
+s3cmci_probe(struct platform_device *pdev)  
+{  
+    //....  
+    struct mmc_host *mmc;  
+    mmc = mmc_alloc_host(sizeof(struct s3cmci_host), &pdev->dev);  //分配mmc_host结构体  
+  
+    //.....  
+}  
+  
+/*注册中断处理函数s3cmci_irq,来处理数据收发过程引起的各种中断*/  
+request_irq(host->irq, s3cmci_irq, 0, DRIVER_NAME, host) //注册中断处理函数s3cmci_irq  
+  
+/*注册中断处理s3cmci_irq_cd函数,来处理热拨插引起的中断，中断触发的形式为上升沿、下降沿触发*/  
+request_irq(host->irq_cd, s3cmci_irq_cd,IRQF_TRIGGER_RISING |IRQF_TRIGGER_FALLING, DRIVER_NAME, host)  
+  
+mmc_add_host(mmc);  //initialise host hardware //向MMC core注册host驱动  
+----> device_add(&host->class_dev); //添加设备到mmc_bus_type总线上的设备链表中  
+----> mmc_start_host(host); //启动mmc host  
+  
+/*MMC drivers should call this when they detect a card has been inserted or removed.检测sd卡是否插上或移除*/  
+ ---->mmc_detect_change(host, 0);  
+  
+/*Schedule delayed work in the MMC work queue.调度延时工作队列*/  
+ mmc_schedule_delayed_work(&host->detect, delay);  
+搜索host->detected得到以下信息：
+[/drivers/mmc/core/host.c]
+[cpp] view plain copy
+NIT_DELAYED_WORK(&host->detect, mmc_rescan);  
+  
+mmc_rescan(struct work_struct *work)  
+---->mmc_bus_put(host);//card 从bus上移除时，释放它占有的总线空间  
+  
+/*判断当前mmc host控制器是否被占用,当前mmc控制器如果被占用,那么  host->claimed = 1;否则为0 
+ *如果为1,那么会在while(1)循环中调用schedule切换出自己,当占用mmc控制器的操作完成之后,执行 *mmc_release_host()的时候,会激活登记到等待队列&host->wq中的其他 程序获得mmc主控制器的使用权 
+ */  
+mmc_claim_host(host);  
+     mmc_rescan_try_freq(host, max(freqs[i], host->f_min)；  
+  
+static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)  
+{  
+     …  
+     /* Order's important: probe SDIO, then SD, then MMC */  
+     if (!mmc_attach_sdio(host))  
+          return 0;  
+     if (!mmc_attach_sd(host))  
+         return 0;  
+     if (!mmc_attach_mmc(host))  
+         return 0;  
+        ….  
+}  
+  
+mmc_attach_sdio(struct mmc_host *host)  //匹配sdio接口卡  
+     --->mmc_attach_bus(host, &mmc_sdio_ops);  
+  
+/*当card与总线上的驱动匹配，就初始化card*/  
+mmc_sdio_init_card(host, host->ocr, NULL, 0);   
+    --->card = mmc_alloc_card(host, NULL);//分配一个card结构体  
+          mmc_set_bus_mode(host, MMC_BUSMODE_PUSHPULL); //设置mmc_bus的工作模式  
+  
+struct sdio_func *sdio_func[SDIO_MAX_FUNCS]; //SDIO functions (devices)  
+  
+sdio_init_func(host->card, i + 1);  
+    --->func = sdio_alloc_func(card); //分配struct sdio_fun（sdio功能设备）结构体  
+          mmc_io_rw_direct（）;  
+          card->sdio_func[fn - 1] = func;  
+  
+mmc_add_card(host->card);  //将具体的sdio设备挂载到mmc_bus_types 总线  
+sdio_add_func(host->card->sdio_func[i]); //将sdio功能设备挂载到sdio_bus_types总线  
+这里一系列函数调用在前面的SD驱动蚊帐中已经阐述过了，不再详细阐述
+
+2、SDIO设备的热插拔
+      当插拔SDIO设备，会触发中断通知到CPU，然后执行卡检测中断处理函数在这个中断服务函数中，mmc_detect_change->mmc_schedule_delayed_work(&host->detect,delay), INIT_DELAYED_WORK(&host->detect, mmc_rescan)会调度mmc_rescan函数延时调度工作队列，这样也会触发SDIO设备的初始化流程，检测到有效的SDIO设备后，会将它注册到系统中去。
+[cpp] view plain copy
+static irqreturn_t s3cmci_irq_cd(int irq, void *dev_id)  
+{  
+     struct s3cmci_host *host = (struct s3cmci_host *)dev_id;  
+     ........  
+     mmc_detect_change(host->mmc, msecs_to_jiffies(500));  
+  
+     return IRQ_HANDLED;  
+}  
+
+三、wifi 驱动部分解析
+wifi驱动的通用的软件架构
+1. 分为两部分，上面为主机端驱动，下面是我们之前所说的firmware
+2. 其中固件部分的主要工作是：因为天线接受和发送回来的都是802.11帧的帧，而主机接受和传送出来的数据都必须是802.3的帧，所以必须由firmware来负责802.3的帧和802.11帧之间的转换
+3. 当天线收到数据，并被firmware处理好后会放在一个buffer里，并产生一个中断，主机在收到中断后就去读这个buffer。
+      
+     SDIO设备的驱动由sdio_driver结构体定义，sdio_driver其实是driver的封装。通过sdio_register_driver函数将SDIO设备驱动加载进内核，其实就是挂载到sdio_bus_type总线上去。
+1、设备驱动的注册与匹配
+[Drivers/net/wireless/libertas/if_sdio.c]
+[cpp] view plain copy
+/* SDIO function device driver*/  
+  
+struct sdio_driver {  
+     char *name;  //设备名  
+     const struct sdio_device_id *id_table; //设备驱动ID  
+     int (*probe)(struct sdio_func *, const struct sdio_device_id *);//匹配函数  
+     void (*remove)(struct sdio_func *);  
+     struct device_driver drv;  
+};  
+下面是具体函数的填充：
+[cpp] view plain copy
+/*if_sdio.c*/  
+  
+static struct sdio_driver if_sdio_driver = {  
+     .name         = "libertas_sdio",  
+     .id_table = if_sdio_ids,  //用于设备与驱动的匹配  
+     .probe        = if_sdio_probe,  
+     .remove       = if_sdio_remove,  
+     .drv = {  
+         .pm = &if_sdio_pm_ops,  
+         }  
+};  
+设备注册函数
+[cpp] view plain copy
+/** 
+ *   sdio_register_driver - register a function driver 
+ *   @drv: SDIO function driver 
+ */  
+  
+int sdio_register_driver(struct sdio_driver *drv)  
+{  
+     drv->drv.name = drv->name;  
+     drv->drv.bus = &sdio_bus_type;  //设置driver的bus为sdio_bus_type  
+     return driver_register(&drv->drv);  
+}  
+总线函数
+[cpp] view plain copy
+static struct bus_type sdio_bus_type = {  
+     .name         = "sdio",  
+     .dev_attrs    = sdio_dev_attrs,  
+     .match        = sdio_bus_match,  
+     .uevent       = sdio_bus_uevent,  
+     .probe        = sdio_bus_probe,  
+     .remove       = sdio_bus_remove,  
+     .pm      = SDIO_PM_OPS_PTR,  
+};  
+注意：设备或者驱动注册到系统中的过程中，都会调用相应bus上的匹配函数来进行匹配合适的驱动或者设备，对于sdio设备的匹配是由sdio_bus_match和sdio_bus_probe函数来完成。
+[cpp] view plain copy
+static int sdio_bus_match(struct device *dev, struct device_driver *drv)  
+{  
+     struct sdio_func *func = dev_to_sdio_func(dev);  
+     struct sdio_driver *sdrv = to_sdio_driver(drv);   
+     if (sdio_match_device(func, sdrv))  
+         return 1;   
+  
+     return 0;  
+}  
+  
+static const struct sdio_device_id *sdio_match_device(struct sdio_func *func,  
+     struct sdio_driver *sdrv)  
+{  
+     const struct sdio_device_id *ids;  
+     ids = sdrv->id_table;             
+  
+    if (sdio_match_one(func, ids))  
+                   return ids;  
+}  
+由以上匹配过程来看，通过匹配id_table 和 sdio_driver设备驱动中id，来匹配合适的驱动或设备。最终会调用.probe函数，来完成相关操作。
+
+2、If_sdio_probe函数
+    当检测到sdio卡插入了之后就会调用If_sdio_probe，而当卡被移除后就会调用If_sdio_remove。
+
+
+下面先看下If_sdio_probet函数，if_sdio_prob 函数 主要做了两件事  
+[cpp] view plain copy
+static struct sdio_driver if_sdio_driver = {  
+ .name  = "libertas_sdio",  
+ .id_table = if_sdio_ids,   //用于设备和驱动的匹配  
+ .probe  = if_sdio_probe,  
+ .remove  = if_sdio_remove,  
+ .drv = {  
+  .pm = &if_sdio_pm_ops,  
+ },  
+};  
+   
+  
+1 //定义一个 if_sdio  card的结构体  
+ struct if_sdio_card *card;  
+ struct if_sdio_packet *packet;  //sdio 包的结构体   
+ struct mmc_host *host = func->card->host;  
+  
+ // 查询是否有指定的功能寄存器在mmc  
+   //_sdio_card中  
+ for (i = 0;i < func->card->num_info;i++) {  
+  if (sscanf(func->card->info[i],  
+    "802.11 SDIO ID: %x", &model) == 1)  
+   
+//在这里进行片选  选择到我们使用的marvell 8686 的设备  
+case MODEL_8686:  
+  card->scratch_reg = IF_SDIO_SCRATCH;  
+   
+   
+//创建sdio 的工作队列   
+card->workqueue = create_workqueue("libertas_sdio");  
+//调用下面的函数  
+INIT_WORK(&card->packet_worker, if_sdio_host_to_card_worker);  
+  
+  
+//主机到卡的工作队列  
+static void if_sdio_host_to_card_worker(struct work_struct *work)  
+  
+ /* Check if we support this card  选择我们所支持的卡的类型*/  
+  //赋值为sd8686_helper.bin   sd8686.bin  
+/*fw_table 中的  MODEL_8686, "sd8686_helper.bin", "sd8686.bin" },?/  
+ for (i = 0; i < ARRAY_SIZE(fw_table); i++) {  
+      if (card->model == fw_table[i].model)  
+           break;  
+ }  
+ { MODEL_8688, "libertas/sd8688_helper.bin", "libertas/sd8688.bin" },  
+   
+  
+//申请一个host  
+sdio_claim_host(func);  
+//使能sdio 的功能 寄存器  
+ret = sdio_enable_func(func);  
+if (ret)  
+  goto release;  
+  
+2//申请 sdio 的中断  当有数据  ,命令 或者是事件 的时间执行中断  
+ret = sdio_claim_irq(func, if_sdio_interrupt);  
+ret = if_sdio_card_to_host(card);  //从无线网卡接收到数据 或者说是上报数据  
+ret = if_sdio_handle_data(card, card->buffer + 4, chunk - 4);   //接收数据的处理   
+ret = if_sdio_handle_cmd(card, card->buffer + 4, chunk - 4);   //处理申请的命令中断  
+ret = if_sdio_handle_event(card, card->buffer + 4, chunk - 4);//处理申请的事件中断  
+  
+  
+//添加网络结构体  分配设备并注册  
+priv = lbs_add_card(card, &func->dev);  
+  
+//分配Ethernet设备并注册   
+ wdev = lbs_cfg_alloc(dmdev);  
+//802无线网的具体的操作函数   
+wdev->wiphy = wiphy_new(&lbs_cfg80211_ops, sizeof(struct lbs_private));  
+  
+   
+//分配网络设备是整个网络部分操作的  
+//的核心结构体  
+dev = alloc_netdev(0, "wlan%d", ether_setup);  //实例化wlan0的属性  
+dev->ieee80211_ptr = wdev;  
+ dev->ml_priv = priv;  
+ //设置设备的物理地址   
+ SET_NETDEV_DEV(dev, dmdev);  
+ wdev->netdev = dev;  
+ priv->dev = dev;  
+   //初始化网络设备 ops.  看门狗    
+  dev->netdev_ops = &lbs_netdev_ops;    //网络设备的具体的操作函数   
+ dev->watchdog_timeo = 5 * HZ;  
+ dev->ethtool_ops = &lbs_ethtool_ops;     
+ dev->flags |= IFF_BROADCAST | IFF_MULTICAST;  //广播或者多播  
+   
+   
+   
+ //启动一个内核线程来管理这个网络设备的数据发送,事件的处理(卡的拔出)和一些命令的处理   
+ priv->main_thread = kthread_run(lbs_thread, dev, "lbs_main");  
+//初始化相关的工作队列  
+ priv->work_thread = create_singlethread_workqueue("lbs_worker");  
+ INIT_WORK(&priv->mcast_work, lbs_set_mcast_worker);  
+ priv->wol_criteria = EHS_REMOVE_WAKEUP;  
+ priv->wol_gpio = 0xff;  
+ priv->wol_gap = 20;  
+ priv->ehs_remove_supported = true;  
+   
+   
+ //设置私有变量   
+//设置主机发送数据到卡  
+ priv->hw_host_to_card = if_sdio_host_to_card;  
+ priv->enter_deep_sleep = if_sdio_enter_deep_sleep;  
+ priv->exit_deep_sleep = if_sdio_exit_deep_sleep;  
+ priv->reset_deep_sleep_wakeup = if_sdio_reset_deep_sleep_wakeup;  
+ sdio_claim_host(func);    
+  
+  //启动卡设备   
+ ret = lbs_start_card(priv);  
+ if (lbs_cfg_register(priv))   
+  
+ ret = register_netdev(priv->dev);  
+ err = register_netdevice(dev);  
+  
+   
+//具体的wifi设备驱动功能   
+//网络设备操作的具体函数   
+static const struct net_device_ops lbs_netdev_ops = {  
+ .ndo_open   = lbs_dev_open,   //打开  
+ .ndo_stop  = lbs_eth_stop,  //停止  
+ .ndo_start_xmit  = lbs_hard_start_xmit,   //开始发送数据  
+ .ndo_set_mac_address = lbs_set_mac_address,   //设置mac地址   
+ .ndo_tx_timeout  = lbs_tx_timeout,    //发送超时  
+ .ndo_set_multicast_list = lbs_set_multicast_list,   //多播地址  
+ .ndo_change_mtu  = eth_change_mtu,  //最大传输单元  
+ .ndo_validate_addr = eth_validate_addr,  //判断地址的有效性   
+
+3、数据的接收,通过中断的方式来解决
+     网络设备接收数据的主要方法是由中断引发设备的中断处理函数，中断处理函数判断中断的类型，如果为接收中断，则读取接收到的数据，分配sk_buff数据结构和数据缓冲区，并将接收的数据复制到数据缓存区，并调用netif_rx()函数将sk_buff传递给上层协议。
+    搜索if_sdio_interrupt，可知道它是在if_sdio.c文件中if_sdio_probe()函数中sdio_claim_irq(func, if_sdio_interrupt) ，func->irq_handler = if_sdio_interrupt。当s3cmci_irq中断处理函数的S3C2410_SDIIMSK_SDIOIRQ 中断被触发时将调用if_sdio_interrupt()函数，进行接收数据。
+[cpp] view plain copy
+static void if_sdio_interrupt(struct sdio_func *func)  
+  
+ret = if_sdio_card_to_host(card);  //从无线网卡接收到数据 或者说是上报数据  
+//读取端口上的数据 ,放到card的buffer中   
+ ret = sdio_readsb(card->func, card->buffer, card->ioport, chunk);  
+1.在这里一方面处理中断  还有2   
+ switch (type) {   //处理cmd   data  event的请求   
+ case MVMS_CMD:  
+  ret = if_sdio_handle_cmd(card, card->buffer + 4, chunk - 4);   //处理申请的命令中断  
+  if (ret)  
+   goto out;  
+  break;  
+ case MVMS_DAT:  
+  ret = if_sdio_handle_data(card, card->buffer + 4, chunk - 4);//处理申请的数据中断   
+  if (ret)  
+   goto out;  
+  break;  
+ case MVMS_EVENT:  
+  ret = if_sdio_handle_event(card, card->buffer + 4, chunk - 4);//处理申请的事件中断  
+   
+//读取包的过程   
+ lbs_process_rxed_packet(card->priv, skb);  
+   
+ //如果是中断 ,就把skb这个包提交给协议层,这个函数是  
+ //协议层提供的  netif_rx(skb)  
+ if (in_interrupt())  
+  netif_rx(skb);    //提交给协议层   
+   
+   
+2//读取端口上的数据 ,放到card的buffer中   
+ ret = sdio_readsb(card->func, card->buffer, card->ioport, chunk);  
+//读取地址,目的地址,数量 等  
+int sdio_readsb(struct sdio_func *func, void *dst, unsigned int addr, int count)  
+  
+         return sdio_io_rw_ext_helper(func, 0, addr, 0, dst, count);  
+  
+                ret = mmc_io_rw_extended(func->card, write,func->num, addr, incr_addr, buf,blocks, func->cur_blksize);  
+                         cmd.arg = write ? 0x80000000 : 0x00000000;  
+                                  
+                    //wait for  request    
+                     mmc_wait_for_req(card->host, &mrq);  
+                        开始应答   
+                         mmc_start_request(host, mrq);  
+                         wait_for_completion(&complete);  
+                                      
+                             host->ops->request(host, mrq);  
+
+4、数据发送
+[cpp] view plain copy
+//IP层通过dev_queue_xmit()将数据交给网络设备协议接口层,网络接口层通过netdevice中的注册函数的数据发送函数  
+int dev_queue_xmit(struct sk_buff *skb)  
+  
+    if (!netif_tx_queue_stopped(txq)) {  
+    __this_cpu_inc(xmit_recursion);  
+   //设备硬件开始发送    
+    rc = dev_hard_start_xmit(skb, dev, txq);  
+  //调用wifi网络中的ops   
+  
+  rc = ops->ndo_start_xmit(skb, dev);  
+  
+  dev->netdev_ops = &lbs_netdev_ops;    //设备的操作函数   
+  
+ //处理sdio firware数据和内核的数据main_thread 主线程    
+ priv->main_thread = kthread_run(lbs_thread, dev, "lbs_main");  
+  
+   //调用host_to_card   即if_sdio_card_to_host函数。   
+   int ret = priv->hw_host_to_card(priv, MVMS_DAT,priv->tx_pending_buf,priv->tx_pending_len);  
+为什么是if_sdio_to_host呢 ?因为在prob函数中定义了这一个  
+//设置主机发送数据到卡  
+ priv->hw_host_to_card = if_sdio_host_to_card;  
+     
+static int if_sdio_host_to_card(struct lbs_private *priv,u8 type, u8 *buf, u16 nb)  
+      //把buf中的数据 copy到sdio 包中,在对sdio 的包进行处理  
+         memcpy(packet->buffer + 4, buf, nb);  
+//创建工作队列    
+         queue_work(card->workqueue, &card->packet_worker);  
+ //初始化队列    
+ INIT_WORK(&card->packet_worker, if_sdio_host_to_card_worker);  
+  
+ //sdio的写数据     
+   ret = sdio_writesb(card->func, card->ioport, packet->buffer, packet->nb);  
+         //mmc写扩展口   
+               ret = mmc_io_rw_extended(func->card, write,func->num, addr, incr_addr, buf,blocks, func->cur_blksize);  
+  
+                    //wait for  request    
+                                 mmc_wait_for_req(card->host, &mrq);  
+                                    
+                             mrq->done_data = &complete;  
+                             mrq->done = mmc_wait_done;  
+                             mmc_start_request(host, mrq);  
+                                //完成等待 写数据结束   
+                             wait_for_completion(&complete);  
+   
+   
+                             host->ops->request(host, mrq);  
+   //到底结束  发送数据    
+
+5、移除函数
+       当sdio卡拔除时，驱动会调用该函数，完成相应操作。如释放占有的资源，禁止func功能函数，释放host。
+[cpp] view plain copy
+if_sdio_remove(struct sdio_func *func)  
+---->lbs_stop_card(card->priv);  
+     lbs_remove_card(card->priv);  
+     ---->kthread_stop(priv->main_thread);  //终止内核线程  
+  
+         lbs_free_adapter(priv);  
+         lbs_cfg_free(priv);  
+          free_netdev(dev);  
+  
+     flush_workqueue(card->workqueue);  //刷新工作队列  
+     destroy_workqueue(card->workqueue);  
+     sdio_claim_host(func);  
+     sdio_release_irq(func);  
+     sdio_disable_func(func);  
+      sdio_release_host(func);  
