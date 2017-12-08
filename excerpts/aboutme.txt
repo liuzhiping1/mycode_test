@@ -1,0 +1,1 @@
+51/pic with assemble -> arm with C -->linux on arm refer to shell /git tools  -> video on hisilicon->AI on enbed
