@@ -1,0 +1,2 @@
+https://linux.cn/article-8807-1.html  linux开机引导，关于systemd和initd的比较
+http://blog.csdn.net/toradexsh/article/details/51908177  arm-linux的开机启动步骤和方式
