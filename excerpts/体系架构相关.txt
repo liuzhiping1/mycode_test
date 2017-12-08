@@ -1,0 +1,14 @@
+《深入linux内核架构》
+体系架构相关知识
+1、数据类型 -<asm-arch/types.h>
+2、对齐 -<asm-arch/unaligned.h>
+3、内存页面 -<asm-arch/page.h>
+4、系统调用 -<asm-arch/unistd.h>
+5、字符串处理 - <asm-arch/string.h>
+6、线程表示 -<asm-arch/ptrace.h> <asm-arch/processor.h> <asm-arch/thread.h>
+7、位操作和字节序 -<asm-arch/bitops.h> -<asm-arch/byteorder.h>
+8、页表 -<asm-arch/pgtable.h>
+9、杂项-校验 -<asm-arch/checksum.h>
+10、杂项-上下文切换-<asm-arch/system.h>
+11、杂项-查找当前进程-<asm-arch/current.h>
+
