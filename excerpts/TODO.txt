@@ -1,0 +1,29 @@
+--------TODO----（base on embed system develop & research）
+
+1、系统启动、移植、内存、ARM、芯片
+2、应用程序、系统调用
+3、驱动程序、内核接口、模块开发
+4、网络设备、网络编程
+5、编译脚本开发
+6、调试
+
+1、启动
+http://blog.csdn.net/linyt/article/details/6582399 arm-linux的启动过程
+
+D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\kernel\head.S （stext）
+D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\kernel\head-common.S (__lookup_processor_type)
+D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\mm\proc-arm920.S （__arm920_proc_info）
+D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\include\asm\mach\arch.h （MACHINE_START）
+D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\mach-s3c24xx\mach-mini2440.c （MACHINE_START(S3C2440, "TQ2440") 、tq2440_map_io）
+arch/arm/kernel/vmlinux.lds（由arch/arm/kernel/vmlinux.lds.S生成） 内核启动程序的入口
+arch/arm/Makefile   【vmlinux.lds里的. = 0xC0000000 + 0x00008000;  】->此处的TEXT_OFFSET表示内核起始地址相对于RAM地址的偏移值
+
+
+
+http://blog.csdn.net/luckyapple1028/article/details/45287617  ARM Linux启动流程分析——start_kernel前启动阶段（汇编部分）【这个很详细】
+
+arch/arm/include/asm/memory.h  ->PAGE_OFFSET表示内核虚拟地址空间的起始地址
+arch/arm/Kconfig   ->CONFIG_PAGE_OFFSET定义在arch/arm/Kconfig中，采用默认值0xC0000000
+D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\include\asm\procinfo.h  -> proc_info_list
+
+ 
