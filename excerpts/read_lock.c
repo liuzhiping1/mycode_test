@@ -2,11 +2,10 @@
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <sdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-void lock_set(int fd ,int type);
 
 int main (void)
 {
@@ -21,25 +20,21 @@ int main (void)
 		exit(1);
 	}
 	//lock write
-	lock_set(fd,F_WRCLK);
 	if(len == (nwrite = write(fd,buff,len)))
 	{
 		printf("write success!");
 	}
 	getchar();
 	//unlock
-	lock_set(fd,F_UNLCK);
 	getchar();
 	//lock read
-	lock_set(fd,F_RDCLK);
 	lseek(fd,0,SEEK_SET);
-	if((nread = read(fd,buf_r)) == len)
+	if((nread = read(fd,buf_r,len)) == len)
 	{
 		printf("read :%s \n",buf_r);
 	}
 	getchar();
 	//unlock
-	lock_set(fd,F_UNLCK);
 	getchar();
 	close(fd);
 	exit(0);
