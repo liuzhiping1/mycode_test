@@ -31,7 +31,7 @@ int main()
 	}
 	printf("open msg queue:%d \n",qid);
 	puts("please intput a message to queue:");
-	if(fgets(&msg->msg_text,BUFSZ,stdin) == NULL)
+	if(fgets((&msg)->msg_text,BUFSZ,stdin) == NULL)
 	{
 		perror("fgets");
 		exit(1);		
@@ -48,7 +48,7 @@ int main()
 		perror("msgrcv");
 		exit(1);		
 	}
-	printf("message is : %s\n",(&msg)->msg_text));
+	printf("message is : %s\n",(&msg)->msg_text);
 	if(msgctl(qid,IPC_RMID,NULL)<0)
 	{
 		perror("msgctl");
