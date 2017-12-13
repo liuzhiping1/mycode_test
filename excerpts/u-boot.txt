@@ -14,6 +14,7 @@ D:\5-video\uboot\u-boot-2010.06\product\env_setup.h ->save environment variables
 D:\5-video\uboot\u-boot-2010.06\arch\arm\lib\interrupts.c 中端异常函数
 D:\5-video\uboot\u-boot-2010.06\arch\arm\cpu\hi3516a\lowlevel_init.S  ->init_registers
 D:\5-video\uboot\u-boot-2010.06\board\hi3516a\config.mk ->TEXT_BASE 
+D:\5-video\uboot\u-boot-2010.06\arch\arm\include\asm\setup.h ->U-Boot使用标记列表（tagged list）的方式向Linux传递参数。标记的数据结构式是tag
 
 uboot.map 可以找到编译之后函数的地址，可以确定是哪个同名函数的调用
 学习方法：
@@ -25,7 +26,7 @@ uboot.map 可以找到编译之后函数的地址，可以确定是哪个同名�
 6、记录重要的节点
 
 
-https://www.cnblogs.com/cslunatic/archive/2013/03/28/2986146.html uboot启动和源码分析(1)
+https://www.cnblogs.com/cslunatic/archive/2013/03/28/2986146.html uboot启动和源码分析(1)  【重要】
 引导过程：
 1．stage1：cpu/arm_cortexa8/start.S
 　　2．当系统启动时, ARM CPU 会跳到 0x00000000去执行,一般 BootLoader 包括如下几个部分：
@@ -46,4 +47,4 @@ https://www.cnblogs.com/cslunatic/archive/2013/03/28/2986146.html uboot启动和
   程序用一个循环将代码搬移到0x81180000，即RAM底端1M空间用来存储代码。然后程序继续将中断向量表搬到RAM的顶端。
   由于stage2通常是C语言执行代码，所以还要建立堆栈去。在堆栈区之前还要将malloc分配的空间以及全局数据所需的空间空下来，他们的大小是由宏定义给出的，可以在相应位置修改。     
 　　　　13> 跳到 C 代码部分执行   
-http://www.cnblogs.com/cslunatic/archive/2013/04/01/2992717.html uboot启动和源码分析(2)
+http://www.cnblogs.com/cslunatic/archive/2013/04/01/2992717.html uboot启动和源码分析(2)  【重要】
