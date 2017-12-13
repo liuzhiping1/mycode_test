@@ -1,0 +1,49 @@
+1、D:\5-video\uboot\u-boot-2010.06\arch\arm\cpu\hi3516a\start.S   ->start :u-boot入口：主要完成初始化看门狗、定时器、重定位（拷贝代码段到内存中）、初始化堆  栈、  跳转到第二阶段等工作
+D:\5-video\uboot\u-boot-2010.06\arch\arm\lib\board.c    ->start_armboot :
+D:\5-video\uboot\u-boot-2010.06\common\main.c ->main_loop:
+D:\5-video\uboot\u-boot-2010.06\arch\arm\lib\bootm.c ->do_bootm_linux
+D:\5-video\uboot\u-boot-2010.06\common\cmd_bootm.c ->do_bootm 
+D:\5-video\uboot\u-boot-2010.06\arch\arm\lib\reset.c ->do_reset
+D:\5-video\uboot\u-boot-2010.06\arch\arm\cpu\hi3516a\chip.c reset_cpu
+D:\5-video\uboot\u-boot-2010.06\drivers\serial\serial_pl01x.c ->serial_init
+D:\5-video\uboot\u-boot-2010.06\arch\arm\lib\cache-cp15.c  ->enable_mmu
+D:\5-video\uboot\u-boot-2010.06\lib\unlzma.c ->decompress
+D:\5-video\uboot\u-boot-2010.06\arch\arm\include\asm\arch-hi3516a\platform.h 单板芯片寄存器地址定义
+D:\5-video\uboot\u-boot-2010.06\include\configs\hi3516a.h 配置单板
+D:\5-video\uboot\u-boot-2010.06\product\env_setup.h ->save environment variables to persistent storage's addr.(used by command "saveenv")
+D:\5-video\uboot\u-boot-2010.06\arch\arm\lib\interrupts.c 中端异常函数
+D:\5-video\uboot\u-boot-2010.06\arch\arm\cpu\hi3516a\lowlevel_init.S  ->init_registers
+D:\5-video\uboot\u-boot-2010.06\board\hi3516a\config.mk ->TEXT_BASE 
+
+uboot.map 可以找到编译之后函数的地址，可以确定是哪个同名函数的调用
+学习方法：
+1、看makefile
+2、编译之后看u-boot.map
+3、看.depend文件
+4、连接脚本文件即lds文件
+5、在linux环境下搜索相关的关键之 find ./ -name "*" |xargs grep keyword 2>/dev/null
+6、记录重要的节点
+
+
+https://www.cnblogs.com/cslunatic/archive/2013/03/28/2986146.html uboot启动和源码分析(1)
+引导过程：
+1．stage1：cpu/arm_cortexa8/start.S
+　　2．当系统启动时, ARM CPU 会跳到 0x00000000去执行,一般 BootLoader 包括如下几个部分：
+　　　　1> 建立异常向量表
+　　　　2> 显示的切换到 SVC 且 32 指令模式
+　　　　3> 设置异常向量表
+　　　　4> 关闭 TLB，MMU，cache，刷新指令 cache 数据 cache
+　　　　5> 关闭内部看门狗
+　　　　6> 禁止所有的中断
+　　　　7> 串口初始化
+　　　　8> tzpc（TrustZone Protection Controller）
+　　　　9> 配置系统时钟频率和总线频率
+　　　　10> 设置内存区的控制寄存器
+　　　　11> 设置堆栈
+　　　　12> 代码的搬移阶段
+　　　　代码的搬移阶段：为了获得更快的执行速度，通常把stage2加载到RAM空间中来执行，因此必须为加载Boot Loader的stage2准备好一段可用的RAM空间范围。空间大小最好是memory page大小(通常是4KB)的倍数，一般而言，1M的RAM空间已经足够了。
+　　　　flash中存储的u-boot可执行文件中，代码段、数据段以及BSS段都是首尾相连存储的，所以在计算搬移大小的时候就是利用了用BSS段的首地址减去代码的首地址，这样算出来的就是实际使用的空间。
+  程序用一个循环将代码搬移到0x81180000，即RAM底端1M空间用来存储代码。然后程序继续将中断向量表搬到RAM的顶端。
+  由于stage2通常是C语言执行代码，所以还要建立堆栈去。在堆栈区之前还要将malloc分配的空间以及全局数据所需的空间空下来，他们的大小是由宏定义给出的，可以在相应位置修改。     
+　　　　13> 跳到 C 代码部分执行   
+http://www.cnblogs.com/cslunatic/archive/2013/04/01/2992717.html uboot启动和源码分析(2)
