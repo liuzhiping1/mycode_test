@@ -22,7 +22,7 @@ int main()
 	else
 	printf("created shared-memory\n");
 	//at share mem
-	if((shmadd=shmat(shmid,0,0)< (char *)0)
+	if(shmadd=shmat(shmid,0,0)< (char *)0)
 	{
 		perror("shmat");
 		exit(1);
