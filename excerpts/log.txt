@@ -3,3 +3,51 @@
 
 1、查看文件D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\01.software\board\document_cn\Hi3516A／Hi3516D SDK 安装以及升级使用说明.txt
 2、查看文件D:\5-video\work_code\video_myworks\osdrv\readme_cn.txt
+3、【问题】编译osdrv的时候没有连接libc.so导致make yaffs工具的时候失败
+    【解答】缺乏libc.a，zypper install glibc-static 安装库即可
+    【原因】在很多第三方程序为了确保在没有相应动态库时运行正常，喜欢在编译最后应用程序时加入-static.在老版本中编译正常，但在新版Fedora下编译常常报错
+4、参考 （查看硬件手册和软件手册）
+    *硬件：D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\00.hardware\chip\document_cn\
+        芯片手册  《Hi3516A／Hi3516D 专业型HD IP Camera Soc用户指南.pdf》
+        用户手册  《Hi3516A 专业型HD IP Camera SoC产品简介.pdf》
+        
+    *软件：D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\01.software\board\document_cn
+        《HiMPP IPC V2.0 媒体处理软件开发参考.pdf》
+        《Hi3516A／Hi3516D Linux开发环境用户指南.pdf》
+        《Hi3516A／Hi3516D SDK 安装以及升级使用说明.txt》  。。。。
+        D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\01.software\pc\DEC_LIB\documents_cn
+        《H.264 PC解码库软件 API参考.pdf》
+        《H.264 PC解码库软件开发指南.pdf》
+        《客户端AMR编解码库API参考.pdf》
+        《客户端音频编解码库API参考.pdf》 。。。。
+        D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\01.software\pc\IVE_CLIB
+        《HiIVE Brief Specification.pdf》
+        D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\01.software\pc\PQ_TOOL\documents_cn
+        《图像质量调试工具使用指南.pdf》
+    *源码：D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\01.software\board\Hi3516A_SDK_V1.0.4.0\package
+        参考学习驱动和应用的例子，开发自己的应用和驱动。
+    
+    4.1->硬件特性：接口时序、管脚复用控制寄存器、软件复用管脚、硬件管脚复用、管脚驱动能力、管脚分布、
+            ->系统管理：复位、时钟、处理器子系统（arm-Cortex-a7处理器600MHZ）、中断系统（96个中断源-64个外部中断）、系统控制器（三种工作模式）、DMA控制器（DMAC流控）、CIPHER（加解密）、定时器（4个timer）、看门狗（32bits减法计数器）、实时时钟（时钟显示和定时报警）、电源管理与低功耗模式控制（低功耗模式）
+       
+            ->存储器接口：DDR控制器、SPI NOR FLASH 存储控制器、NAND FLASH控制器、SPI NAND FLASH控制器
+       
+            ->GSF(千兆以太网交换接口实现网络接口的数据的接收和发送，支持10/100/1000Mbit/s模式可配置，EEE能效以太网、WoL网络唤醒功能)
+       
+            ->视频编码（视频编解码器是一个支持H.264/H.265/JPEG 的多协议编解码器，包括AVC、VEDU和JPGE 三部分，其中AVC 实现H.264 协议的编码，VEDU 实现H.265 协议的编解码，JPEG 实现JPEG 协议的编码）
+            
+            ->视频及图形处理（TDE-Two Dimensional engine，VPSS-Video process sub-system，VGS-video graph system）
+       
+            ->运动检测单元（MDU）
+       
+            ->智能加速引擎（IVE）
+       
+            ->视频接口（VICAP-视频捕获单元，VDP-video Display processor，MIPI Rx-移动行业处理器接口）
+       
+            ->ISP（）
+       
+            ->音频接口（i2s PCM,DMA方式存取数据）
+       
+            ->外围设备（I2C SPI UART MMC/SD/SDIO 红外接口 GPIO USB2.0 LSADC_CTRL PWM）
+     
+    4.2->sdk软件特性：
