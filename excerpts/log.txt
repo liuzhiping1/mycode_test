@@ -1,0 +1,5 @@
+日志：
+1214：通过sdk自带的应用和驱动程序学习修改移植。将sdk全部解压建仓，先看脚本文件，在看具体的代码。
+
+1、查看文件D:\5-video\hi3516_sdk\Hi3516A V100R001C01SPC040\01.software\board\document_cn\Hi3516A／Hi3516D SDK 安装以及升级使用说明.txt
+2、查看文件D:\5-video\work_code\video_myworks\osdrv\readme_cn.txt

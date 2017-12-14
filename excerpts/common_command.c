@@ -19,7 +19,9 @@ uname
 service
 vmstat
 uptime
+du -sh
 at 在指定时间执行程序
+lsof
 3、编程开发
 ldconfig 动态链接库配置命令
 objdump 显示二进制信息
@@ -33,8 +35,15 @@ traceroute 显示数据包到主机的距离
 lsusb 显示usb设备列表信息
 arch 显示当前主机硬件架构类型
 hwclock
+lscpu
+lsdev
 5、其他
 more 
 less
 find . -name * |xargs grep key
+git 相关
+lsmod
+insmod
+probe
+modinfo
 

@@ -21,6 +21,7 @@ D:\5-video\uboot\u-boot-2010.06\common\cmd_slavestart.c  ->slave_start
 
 
 start(start.S) -> start_armboot(board.c) -> slave_start (cmd_slavestart.c) -> run_command_slave (main.c) ->do_boot(cmd_bootm.c)->boot_os(cmd_bootm.c) ->  (do_bootm_linux(bootm.c)->cleanup_before_linux(cpu.c))
+
 uboot.map 可以找到编译之后函数的地址，可以确定是哪个同名函数的调用
 学习方法：
 1、看makefile

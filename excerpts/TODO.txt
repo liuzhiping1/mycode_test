@@ -1,81 +1,10 @@
 --------TODO----（base on embed system develop & research）
 
-1、系统启动、移植、内存、ARM、芯片
+1、系统启动、移植、内存、ARM、芯片、环境搭建（开发环境、工具等）
 2、应用程序、系统调用
 3、驱动程序、内核接口、模块开发
 4、网络设备、网络编程
 5、编译脚本开发
 6、调试
 
-1、启动
-http://blog.csdn.net/linyt/article/details/6582399 arm-linux的启动过程
 
-D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\kernel\head.S （stext）
-D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\kernel\head-common.S (__lookup_processor_type)
-D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\mm\proc-arm920.S （__arm920_proc_info）
-D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\include\asm\mach\arch.h （MACHINE_START）
-D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\mach-s3c24xx\mach-mini2440.c （MACHINE_START(S3C2440, "TQ2440") 、tq2440_map_io）
-arch/arm/kernel/vmlinux.lds（由arch/arm/kernel/vmlinux.lds.S生成） 内核启动程序的入口
-arch/arm/Makefile   【vmlinux.lds里的. = 0xC0000000 + 0x00008000;  】->此处的TEXT_OFFSET表示内核起始地址相对于RAM地址的偏移值
-
-
-
-http://blog.csdn.net/luckyapple1028/article/details/45287617  ARM Linux启动流程分析——start_kernel前启动阶段（汇编部分）【这个很详细】
-
-arch/arm/include/asm/memory.h  ->PAGE_OFFSET表示内核虚拟地址空间的起始地址
-arch/arm/Kconfig   ->CONFIG_PAGE_OFFSET定义在arch/arm/Kconfig中，采用默认值0xC0000000
-D:\5-video\linux-3.4.y\linux-3.4.y\arch\arm\include\asm\procinfo.h  -> proc_info_list
-
- 
-【知识点】
-守护进程的具体调试过程可以用syslog服务，将程序中的出错信息输入到“/var/log/message”系统日志文件中，从而可以直观的看到程序的问题所在。
-
-http://blog.csdn.net/mybelief321/article/details/9069659  守护进程的编写
-
-1、创建子进程，父进程退出  fork()
-2、创建新的会话期  setsid()
-3、改变当前工作目录为根目录 chdir()
-4、重新设置文件权限掩码 umask()
-5、关闭文件描述符 getdtablesize()
-
-https://www.cnblogs.com/softidea/p/3965093.html
-& 表示等同于的意思，2>&1，表示2的输出重定向等同于1，即和1重定向的文件系统上的位置是一样的
-
-http://blog.csdn.net/funkunho/article/details/52458148?locationNum=2  u-boot的移植（一）初步分析
-5.3 总结
-
-5.3.1 start.S中： 
-(1) 将CPU设为SVC模式 
-(2) 关看门狗 
-(3) 屏蔽中断 
-(4) 设置分频系数，未设置时钟频率 
-(5) bl cpu_init_crit 
-　　[1]清除caches 
-　　[2] 禁止 MMU cache 
-　　[3] bl lowlevel_init 　在重定位之前，需要设置好内存管理器的各时序参数，这个函数的源文件在对应的单板目录中。对于smdk2410, 在board/samsung/smdk2410/lowlever_init.S 中定义了这个函数
-
-(6) bl _main 在arch/arm/lib/crt0.S中定义
-
-5.3.2 crt0.S中： 
-(1) 设置栈，使程序可以在运行C代码 
-(2) bl board_init_f_alloc_reserve 给gd_t预留空间，gd_t是global_data结构体，里面存放了各种硬件相关参数，一般将gd_t的地址存放在r9中 
-(3) bl board_init_f_init_reserve 初始化gd_t(清零) 
-(4) bl board_init_f 在这里面进行各种初始化，分配内存空间，填充gd_t结构体 
-(5) 在代码重定位前，将重定位后的GD地址放入r9中 
-(6) 重定位代码，地址是gd->relocaddr 
-(7) 进入SDRAM中运行 
-(8) 清bss段 
-(9) 进入board_init_r()进行其他初始化(不返回)
-至此，我们的初步分析就到这里结束，下面将开始分析如何添加单板，以及如何修改启动代码使串口有输出
-
-http://blog.csdn.net/funkunho/article/details/52465636  u-boot的移植（二）添加单板
-1、在board中添加单板目录
-2、创建单板相关头文件 ->include/configs/目录下的smdk2410.h文件复制为smdk2440.h
-
-http://blog.csdn.net/funkunho/article/details/52474373 u-boot的移植（三） 代码重定位
-1. 分析common/board_init_f()
-
-D:\5-video\uboot\u-boot-2010.06\arch\arm\include\asm\arch-hi3516a\platform.h 单板芯片寄存器地址定义
-D:\5-video\uboot\u-boot-2010.06\include\configs\hi3516a.h 配置单板
-
-https://www.cnblogs.com/xuyh/p/5091550.html  u-boot简单学习笔记
