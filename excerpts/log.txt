@@ -85,3 +85,49 @@
 
 		因为中断上下文是和特定进程无关的，它是内核代表硬件运行在内核空间，所以在终端上下文无法访问用户空间的虚拟地址
 	4、linux输入子系统（http://www.cnblogs.com/reality-soul/p/4705712.html）
+1219：新的一天新的逻辑新的开始（笔记是知识积累的重要载体），今天就是学习i2c的驱动，集中精力对准一点猛攻
+https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
+
+	1、i2c驱动的分析
+		1.1、硬件描述：模块的作用是完成cpu对i2c总线上的从设备的读写，在写操作的时候，CPU通过总线配置i2c的配置寄存器然后发送控制信息和操作数到i2c模块的数据通信寄存器，i2c模块解析命令后将数据	通道寄存器的数据通过i2c总线发送给从设备，发送完毕后将最终的状态通过中断反馈给cpu。读从设备的数据和写操作类似。   【【 CPU<-->I2C模块<--(通过I2C总线) -->从设备 】】
+		   hi3516a包含3个I2C模块，寄存器基地址分别为：0X200d_0000 、0x2024_0000 、0x2025_0000  有26个寄存器
+		1.2、i2c的操作指南
+			准备工作：sdk发布的linux内核、文件系统（yafss2、jffs2、SqushFs、NFS）
+			操作过程：启动单板，加载文件系统；加载内核模块（insmod）；在控制台下运行I2C读写命令或者自行在内核态和用户态的读写i2c的程序，就可以对挂载在i2c总线上的从设备进行读写操作
+			接口速率设置：在内核配置的时候在【驱动选项】中选择配置
+			操作示例：1.2.1、I2C读写命令  ~ $ i2c_read <i2c_num> <device_addr> <reg_addr> <end_reg_addr> <reg_width> <data_width> <reg_step>
+										  ~ $ i2c_write <i2c_num> <device_addr> <reg_addr> <value> <reg_width> <data_width>
+					  1.2.2、内核态读写程序 ：在内核态通过i2c读写程序对i2c外围设备的读写操作 (利用linux的i2c驱动体系结构)
+								1)调用和核心层的函数获取一个描述控制器的结构体 i2c_adap = i2c_get_adapt(2);
+								2)把控制器和设备关联起来 hi_client = i2c_new_device(i2c_adapt,hi_info);
+								3)调用内核i2c核心层提供的接口对从设备进行读写
+					  1.2.3、用户态读写程序：（把i2c设备当做普通的字符设备）
+								1)打开i2c总线对应的设备文件获取文件描述符 fd = open("/dev/i2c-2", O_RDWR); 
+								2)通过ioctl设置外围设备的地址、寄存器的位宽和数据位宽 ioctl(fd, I2C_SLAVE_FORCE, device_addr); ioctl(fd, I2C_16BIT_REG, 0); 
+								3)使用read/write进行数据的读写read(fd, recvbuf, reg_width); 
+								
+		1.3、编写具体的I2C驱动时，工程师需要处理的主要工作如下：
+ 
+　			　1).提供I2C适配器的硬件驱动，探测，初始化I2C适配器(如申请I2C的I/O地址和中断号)，驱动CPU控制的I2C适配器从硬件上产生。
+　			　2).提供I2C控制的algorithm, 用具体适配器的xxx_xfer()函数填充i2c_algorithm的master_xfer指针，并把i2c_algorithm指针赋给i2c_adapter的algo指针。
+              3).实现I2C设备驱动中的i2c_driver接口，用具体yyy的yyy_probe()，yyy_remove()，yyy_suspend(),yyy_resume()函数指针和i2c_device_id设备ID表赋给i2c_driver的probe,remove,suspend,resume和id_table指针。
+　　		  4).实现I2C设备所对应类型的具体驱动，i2c_driver只是实现设备与总线的挂接。　
+　　      		上面的工作中前两个属于I2C总线驱动，后面两个属于I2C设备驱动。
+		1.4、 linux的i2c子系统
+			除了分离，i2c子系统也体现的软件分层的设计思想, 整个i2c子系统由3层构成：设备驱动层--i2c核心--控制器驱动
+			xx_driver->{probe->{init->init_device + ops->{open,release,ioctl}}}+{xx_remove}
+		1.5、设备树 http://www.cnblogs.com/xiaojiang1025/p/6131381.html
+		1.6、平台设备 http://www.cnblogs.com/xiaojiang1025/p/6367910.html
+			写驱动也有一段时间了，可以发现，其实驱动本质上只做了两件事：向上提供接口，向下控制硬件，当然，这里的向上并不是直接提供接口到应用层，而是提供接口给内核再由内核间接的将我们的接口提供给应用层。而写驱动也是有一些套路可寻的，拿到一个硬件，我们大体可以按照下面的流程写一个驱动：
+				http://www.cnblogs.com/xiaojiang1025/p/6367910.html
+			1）确定驱动架构：根据硬件连接方式结合分层/分离思想设计驱动的基本结构
+			2）确定驱动对象：内核中的一个驱动/设备就是一个对象，1.定义，2.初始化，3.注册，4.注销
+			3）向上提供接口：根据业务需要确定提供cdev/proc/sysfs哪种接口
+			4）向下控制硬件：1.查看原理图确定引脚和控制逻辑，2.查看芯片手册确定寄存器配置方式，3.进行内存映射，4.实现控制逻辑
+			
+		driver与device的匹配
+			设备信息有三种表达方式，而一个驱动是可以匹配多个设备的，平台总线中的驱动要具有三种匹配信息的能力，基于这种需求，platform_driver中使用不同的成员来进行相应的匹配。
+				of_match_table ： 对于使用设备树编码的设备信息，我们使用其父类device_driver中的of_match_table就是用来匹配
+				id_table： 对于使用C语言编码的设备信息，我们用platform_driver对象中的id_table就是用来匹配
+				name ：如果platform_driver和C语言编码的platform_device是一一匹配的，我们还可以使用device_driver中的name来进行匹配
+		1.7、http://www.cnblogs.com/xiaojiang1025/p/6369065.html linux platform 驱动模型之 platform+cdev
