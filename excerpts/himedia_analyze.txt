@@ -1,0 +1,59 @@
+struct device himedia_bus = {
+	.init_name	= "himedia",
+	.release    = himedia_bus_release
+};
+struct bus_type himedia_bus_type = {
+	.name		= "himedia",
+	.dev_attrs	= himedia_dev_attrs,
+	.match		= himedia_match,
+	.uevent		= himedia_uevent,
+	.pm		    = &himedia_bus_pm_ops,
+};
+static struct file_operations himedia_fops = {
+	.owner		= THIS_MODULE,
+	.open		= himedia_open,
+};
+struct himedia_device  {
+	struct list_head list;
+
+#define MAX_LEN 32	
+    char devfs_name[MAX_LEN];
+    
+	int minor;
+
+    struct device device;
+
+	struct module *owner;
+
+	const struct file_operations *fops;
+	
+	struct himedia_ops *drvops;
+
+    /*for internal use*/
+	struct himedia_driver *driver;
+};
+1、平台设备初始化himedia_init（总线初始化himedia_bus_init（注册设备device_register，总线注册bus_register），字符串设备注册register_chrdev）
+
+2、某某设备初始化ak7756en_init（具体平台设备注册himedia_register(&s_stAk7756enDevice)（设备注册himedia_device_register（device_register），驱动注册himedia_driver_register（driver_register）），i2c客户端初始化i2c_client_init（i2c_get_adapter，i2c_new_device，i2c_put_adapter），某某设备初始化ak7756en_device_init）
+
+3、mipi_init(void){
+	himedia_register(&s_stHiMipiDevice);
+	{
+		himedia_device_register(himedia);
+		himedia_driver_register(himedia->devfs_name, himedia->owner, himedia->drvops);
+	}
+	mipi_drv_init_reg();
+	request_irq(MIPI_IRQ, &mipi_interrupt_route, 0, "mipi int", NULL);
+	proc_create(MIPI_PROC_NAME, 0, NULL, &mipi_proc_fops);hi_mipi_init();
+	hi_mipi_init();
+	{
+		/* asic need modify */
+		/* mipi apb reset/unreset */
+		/* power init */
+		/* int mask, enable frame int */
+		
+	}
+	}
+int himedia_register(struct himedia_device *himedia) 注册设备到内核
+static int __init ak7756en_init(void) 音频模块驱动初始化
+总结：1、向内核注册模块 2、初始化i2c的模块 3、初始化设备的参数 4、注册reboot的通知处理

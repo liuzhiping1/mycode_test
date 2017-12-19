@@ -1,0 +1,48 @@
+CPU与音频芯片通过i2c 协议通信
+1、module_init ->ak7756en_init ->himedia_register(&s_stAk7756enDevice)
+							->i2c_client_init()
+							->ak7756en_device_init()->register_reboot_notifier(&ak7756en_reboot_notifier)
+							
+							
+							
+							
+							
+2、module_exit-> ak7756en_exit->i2c_client_exit()
+							->ak7756en_device_exit()
+							->unregister_reboot_notifier(&ak7756en_reboot_notifier)
+							->himedia_unregister(&s_stAk7756enDevice)
+							
+							
+3、struct himedia_device  {
+	struct list_head list;
+
+#define MAX_LEN 32	
+    char devfs_name[MAX_LEN];
+    
+	int minor;
+
+    struct device device;
+
+	struct module *owner;
+
+	const struct file_operations *fops; =&ak7756en_fops
+	
+	struct himedia_ops *drvops; = &stAk7756enDrvOps
+
+    /*for internal use*/
+	struct himedia_driver *driver;
+}; =s_stAk7756enDevice
+
+4、static struct file_operations ak7756en_fops =
+{
+    .owner			= THIS_MODULE,
+    .unlocked_ioctl	= ak7756en_ioctl,
+    .open			= ak7756en_open,
+    .release		= ak7756en_close
+};
+
+5、struct himedia_ops stAk7756enDrvOps =
+{
+    .pm_freeze  = ak7756en_freeze,
+    .pm_restore = ak7756en_restore
+};
