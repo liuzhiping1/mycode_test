@@ -189,3 +189,50 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
 	7、有些驱动程序是直接或混合驱动程序，有些驱动程序通过procfs或者sysfs而不是/dev节点进行设备的访问
 	
 	8、wifi
+		WLAN驱动程序的任务是让你的卡详通用的网络接口一样，驱动程序的实现分为以下几个部分：
+		1）与linux网络协议栈通信的接口
+		2）结构因数相关的代码
+		3）芯片组特定部分
+		4）对无线扩展的支持
+	9、网络接口层  			****（最终的目的还是归结到提高看代码的能力，要一眼就会【用source insight看源码+驱动开发指南+网络博客】。）*****
+		NIC不通过/dev 或/sys来与用户空间通信，应用程序是通过网络接口和NIC的驱动程序来互操作的。网络接口对底层协议栈的抽象。
+		数据结构：		  
+			@形成网络协议栈构造块的数据结构。定义在linux/skbuff.h文件中的sk_buff，是内核TCP/ip栈的关键结构体
+			@定义NIC驱动程序和协议栈间接口的数据结构。定义在linux/netdevice.h文件中的net_device是构成该接口的核心结构体	
+			@与IO总线相关的结构体，PCI及其派生的总线是常用的
+	【总结】-{看代码的时候觉得结构体中包含父类的结构体指针的意义在于继承父类的数据，可以调用父类的资源和方法}-{写出好的驱动程序，要了解硬件的原理特性还要了解操作系统的体系结构才能融合进系统，利用系统的资源和方法}-{一个函数写得好还体现在逻辑上易于阅读} -{看代码要沿着代码的执行路线上来看，同时还是大路不是小路，梢枝末节要先忽略后面再研究}
+			@设备打开时调用的函数{注册中断、分配ring、开始接收netif_start_queue}
+			@设备的初始化函数：{分配一个网络设备结构体、填充对设备操作的方法如open、填充数据传送方法如hard_start_xmit、看门狗、统计和配置工具、挂载的总线的地址、注册该网络设备}
+			@设备发生中断时的处理：{接收数据，追加在skb包尾，发给网络协议层如TCP/IP}
+			@设备在关闭时调用的函数：{通知协议层不要继续发数据netif_stop_queue}
+			@设备移除是调用的函数：{注销网络设备、释放资源}
+			@用sys/class/net下的文件可以操作NIC驱动程序参数，用proc/sys/net可以配置协议变量，proc/net目录有系统相关的网络信息集合。
+			-------------------------数据结构小节--------------------------------------------------
+			sk_buff      /include/linux/skbuff.h   		sk_buff向linux网络层提供充分的缓冲区处理以及流控机制
+			net_device	 /include/linux/netdevice.h 	NIC和TCP/IP协议栈的接口
+			net_device_stats 同上						附属于某个网络设备上的统计信息
+			ethtool_ops   /include/linux/ethtool.h   	将驱动程序与ethtool工具集绑定
+			--------------------内核编程接口小节------------------
+			alloc_netdev() 		net/core/dev.c  		分配 net_device
+			alloc_etherdev()	net/ethernet/eth.c 		alloc_netdev()的封装
+			free_netdev() 		net/core/dev.c 			alloc_netdev()的反操作
+			register_netdev() 	net/core/dev.c			注册net_device
+			unregister_netdev() net/core/dev.c
+			dev_alloc_skb() 	include/linux/skbuff.h  为sk_buff分配内存，并为其关联数据包负载缓冲区
+			dev_kfree_skb() 	include/linux/skbuff.h net/core/skbuff.c   上面的反操作
+			skb_reserve() 		include/linux/skbuff.h   在数据包缓冲区和有效负载的开头之间填充
+			skb_clone() 		net/core/skbuff.c		创建sk_buff的副本，但是不复制关联的缓冲区的内容
+			skb_put() 			include/linux/skbuff.h   将数据进入数据包的尾部
+			netif_rx() 			net/core/dev.c			将网络数据包传送给TCP/IP栈
+			
+			{netif_rx_schedule_prep() include/linux/netdevice.h 
+			netif_rx_schedule()}    net/core/dev.c 					将网络数据包传送给TCP/IP栈（NAPI）
+			netif_receive_skb()	 net/core/dev.c			从poll函数将数据包传递给TCP/IP协议栈（NAPI）
+			netif_rx_complete() include/linux/netdevice.h 在轮询列表中移除设备（NAPI）
+			netif_device_detach() net/core/dev.c		分离设备（通常在电源挂起时调用）
+			netif_device_attach() net/core/dev.c		附着设备（电源恢复）
+			netif_start_queue() include/linux/netdevice.h 表明开始从网络协议栈接收数据
+			netif_stop_queue() include/linux/netdevice.h	要求网络层停止下传数据
+			netif_wake_queue() include/linux/netdevice.h 重新开动发送队列
+			netif_queue_stopped() include/linux/netdevice.h 检查流控状态
+			

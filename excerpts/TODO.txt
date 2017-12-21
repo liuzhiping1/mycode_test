@@ -1,13 +1,13 @@
 --------TODO----（base on embed system develop & research）
 
-1、系统启动、移植、内存、ARM、芯片（cpu，wifi）、环境搭建（开发环境、工具等）、网络协议
+1、系统启动、移植、内存、ARM、芯片（cpu，wifi）、环境搭建（开发环境、工具等）
 2、应用程序、系统调用
 3、驱动程序、内核接口、模块开发
 4、网络设备、网络编程
 5、编译脚本开发
 6、调试
-
---思路--
+7、在linux中的网络协议、usb协议、i2c、sdio、pci等
+--思路--【打开一个突破口就从i2c模块子系统开始】
 1、重新整理一下业务相关的模块（VI，VO，etc）
 2、整理一下底层支撑相关的模块（os，drv，uboot，busybox ，编译，etc）
 3、整理工具（华为开发云，github，git，opensuse，etc）
