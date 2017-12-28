@@ -50,3 +50,4 @@ udevadm monitor 可以用于将驱动程序核心事件和 udev 事件处理的�
 od od命令用于输出文件的八进制、十六进制或其它格式编码的字节，通常用于显示或查看文件中不能直接显示在终端的字符。
 
 来自: http://man.linuxde.net/od
+fbset显示帧缓冲特性
