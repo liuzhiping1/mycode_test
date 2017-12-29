@@ -294,7 +294,8 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
 				
 20171227:
 		搞stm8的程序。
-20171228: D:\4-arm\stm32F4xx参考手册.pdf
+20171228:
+	**D:\4-arm\stm32F4xx参考手册.pdf
 	学习USB 【配合stm32的参考手册学习USB协议可以加深理解】
 	1、高速 148Mb/s，全速12Mb/s ，低速1.5Mb/s 
 	2、应用程序通过AHB接口对控制和状态寄存器（CSR）进行读写操作，以此来控制OTG_HS模块。
@@ -346,3 +347,51 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
 		4、DMA模式
 			AHB主接口使用经过编程的DMA地址（主机模式HCDMAx寄存器和设备模式DIEPDMAx/DOEPDMAx）来访问数据缓冲区。
 		
+	**D:\0-linux\宋宝华_精通LINUX设备驱动开发.pdf
+		优点：USB支持热插拔、数据传输模式多样、驱动程序通用
+		主机控制器：
+			UHCI（Universal Host Controller Interface,通用主机控制接口）
+			OHCI（open Host Controller Interface，开发主机控制接口） 他的驱动程序比UHCI更简单
+			EHCI（Enhanceed Host Controller Interface，增强型主机控制接口）支持高速usb2.0设备，通常包含低速的控制器
+			USB OTG控制器：双重角色设备，用HNP（Host Negotiation Protocol，主机沟通协议）初始化设备连接后这样的设备在主机模式和设备模式之间任意切换。
+20171229： USB的学习-从linux的驱动程序着手 D:\0-linux\宋宝华_精通LINUX设备驱动开发.pdf 【在专注的学习子系统后，对代码的阅读也有很大的帮助】
+	第11章 usb 子系统
+	4种传输模式：控制传输模式、批量传输模式、中断传输模式、等时传输模式
+	控制：传送外设和主机之间的控制、状态配置等信息
+	批量；传输大量时延要求不高的数据
+	中断：传输数据量小，但是对时延敏感，要求立即响应
+	等时：传输实时数据，传输速度要预先感知
+	**寻址：每个可寻址单元称作端点，为每个端点分配的地址叫端点地址，每个端点地址都有与之相关的传输模式。如果一个端点的传输模式是批量模式，该端点叫批量端点。地址为0的端点专门用来配置设备。
+	上行方向：设备端数据到控制器 -IN传输
+	下行方向：控制器端数据到设备端 -OUT传输
+	**与I2C和PCI总线的共同点：和I2C一样采用主从结构，设备地址不占用CPU寻址范围，地址位数为7，设备内存没有映射到CPU内存和IO内存，因此不占用CPU资源。和PCI一样设备支持热插拔，设备驱动程序架构相似。驱动程序结构体都包含probe()函数和disconnect()函数，都包含识别设备的ID表，支持高速率数据传输，但比PCI低一点，和PCI控制器一样，USB主机控制器的内嵌有可以获得总线控制权的DMA引擎，支持多功能设备，USB支持每个功能都有其接口描述符，相应的多功能PCI设备的每个功能都有自己的设备ID表和配置空间
+	**linux-USB子系统
+	
+	---------------------------------------------------
+	用户空间
+	          USB用户模式设备驱动程序        用户应用程序
+	------------------|--------------------------|--
+	内核空间        usbfs   <-->   usbcore    /dev、 /sys、 其他内核层如SCSI、串行、网络、输入、蓝牙等
+									/	  \	     |
+	             USB主机控制器驱动程序    usb客户驱动程序
+	内核空间                      |	            |
+	------------------------------|-------------|--------
+	硬件                  usb主机控制器  <--  USB设备
+	-------------------------------------------------------
+	**驱动程序的数据结构体： （每个设备驱动程序子系统都有区别与其他设备驱动程序的结构体，该结构体在内核中代表所驱动的设备如usb_device属于USB子系统，pci_dev属于PCI层，net_deivce属于网络驱动程序层。）
+		1、struct usb_device；
+		2、struct urb; (USB request block)usb传输机制使用的核心数据结构，urb共usb协议栈使用，相应的sk_buff供网络协议栈使用。
+			urb的使用分三步：分配内存，初始化，提交。用usb_alloc_urb()分配内存并清零，之后初始化相关的kobject和保护URB的自旋锁，USB核心提供辅助例程usb_fill_[control|int|bulk]_urb()完成URB的初始化工作。
+			调用usb_submit_urb()异步提交URb以供数据传输。核心层也提供了接口int usb_[control|interrupt|bulk]_msg(struct usb_device *usb_dev,unsigned int pipe, ...);
+			urb任务完成后，usb_free_urb()函数释放该实例，usb_unlink_urb()函数取消一个待处理的URB。
+			@管道：一个和URB相关的抽象的概念。
+				管道包括-地址空间-数据传输方向（IN、OUT）-数据传输模式（控制、批量、中断、等时）
+				usb核心提供现成的宏来创建管道：usb_[rcv|snd][ctrl|int|bulk|isoc]pipe(struct usb_device *usb_dev,__u8 endpointAddress);
+		3、描述符结构
+		struct usb_device_descriptor、struct usb_config_descriptor、struct usb_interface_descriptor、struct usb_endpoint_descriptor
+		4、usb_device_id、usb_class_driver等等
+    **设备实例：USB遥测卡
+		设备的驱动程序通过USB总线连接处理器。
+		USB遥测卡的端点说明：控制端点附在卡上一个配置寄存器中；批量IN负责把设备数据传递给处理器；批量OUT负责把处理器过来的数据
+		可以基于drivers/usb/usb-skeleton.c文件提供的框架为设备编写设备驱动程序。
+		因为PCI设备、PCMIA设备和USB设备有相似的特点，所以驱动程序有很多相似的函数和结构体，尤其是初始化和探测部分，所以可以多借鉴。
