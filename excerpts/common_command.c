@@ -51,3 +51,4 @@ od od命令用于输出文件的八进制、十六进制或其它格式编码的
 
 来自: http://man.linuxde.net/od
 fbset显示帧缓冲特性
+git push huawei master:huawei_b 把当前master分支推向远端huawei仓库的huawei_b分支
