@@ -54,3 +54,12 @@ https://www.cnblogs.com/cslunatic/archive/2013/03/28/2986146.html uboot启动和
   由于stage2通常是C语言执行代码，所以还要建立堆栈去。在堆栈区之前还要将malloc分配的空间以及全局数据所需的空间空下来，他们的大小是由宏定义给出的，可以在相应位置修改。     
 　　　　13> 跳到 C 代码部分执行   
 http://www.cnblogs.com/cslunatic/archive/2013/04/01/2992717.html uboot启动和源码分析(2)  【重要】
+
+@Booting ARM linux：/osdrv/opensource/kernel/linux-3.4.y/Documentation/arm/Booting"
+		Essentially, the boot loader should provide (as a minimum) the
+		following:
+		1. Setup and initialise the RAM.
+		2. Initialise one serial port.
+		3. Detect the machine type.
+		4. Setup the kernel tagged list.
+		5. Call the kernel image.

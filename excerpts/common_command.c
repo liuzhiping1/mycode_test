@@ -57,3 +57,7 @@ Nslookup  	使用dns服务器查询域名
 Hostname 查看当前的主机名。
 Dhclient 使用dhclient命令可以从DHCP服务器中申请新的网络配置应用到当前主机。
 lsof –i lsof全名为list opened files，即列出系统中已经被打开的文件。查看套接字
+df -l
+fdisk /dev/sdb
+parted /dev/sdb  功能更强大 ，然后输入print list
+dd if=   of=    转换文件-convert and copy a file
