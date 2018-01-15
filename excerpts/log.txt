@@ -536,9 +536,15 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
     
     http://blog.csdn.net/u010137431/article/details/50345717  VirtualBox的网络配置，Host Only+NAT方式
     
-    【总结】当前我的虚拟机的联网模式是host-only、NAT模式，于是在虚拟机上有两个网络接口eth0和eth1,（ifconfig -a 查看没有起来的端口），在host-only模式下（eth0），虚拟机设置静态ip地址192.168.56.101/24，可以用ssh直接登入端口22，但是不能联网.
-    于是配置NAT模式，该模式可以联网，设置NAT网络（网络ip10.0.2.0/24，主机ip用dhcp），然后在linux中设置eth1并up起来，此时可以上网了（宿主机能联网）。在NAT模式下，可以设置端口映射，设置宿主机9033端口映射虚拟机的22号端口，即可用宿主机ip+9033端口登入虚拟机了。所以我现在有两种方式登入：192.168.56.101:22和172.17.72.180:9033，前者只有我的电脑能用，使用的是虚拟机的eth0（用静态ip），后者宿主机所在局域网也能登入，用dhcp动态ip。
-    挂在共享文件夹：sudo mount.vboxsf share /mnt/share  
+    【总结】
+	@ openSUSE ->
+		当前我的虚拟机的联网模式是host-only、NAT模式，于是在虚拟机上有两个网络接口eth0和eth1,（ifconfig -a 查看没有起来的端口），在host-only模式下（eth0），虚拟机设置静态ip地址192.168.56.101/24，可以用ssh直接登入端口22，但是不能联网.
+		于是配置NAT模式，该模式可以联网，设置NAT网络（网络ip10.0.2.0/24，主机ip用dhcp），然后在linux中设置eth1并up起来，此时可以上网了（宿主机能联网）。在NAT模式下，可以设置端口映射，设置宿主机9033端口映射虚拟机的22号端口，即可用宿主机ip+9033端口登入虚拟机了。所以我现在有两种方式登入：192.168.56.101:22和172.17.72.180:9033，前者只有我的电脑能用，使用的是虚拟机的eth0（用静态ip），后者宿主机所在局域网也能登入，用dhcp动态ip。
+		挂在共享文件夹：sudo mount.vboxsf share /mnt/share  
+	@ ubuntu->
+		http://www.linuxidc.com/Linux/2012-07/64329.htm  Ubuntu下使用Vi是方向键变乱码 退格键不能使用的解决方法
+		ubuntu的共享文件夹要先在虚拟机的【设备】中点击安装【安装增强功能】，ubuntu就会自动安装，然后在root权限下挂载好已经设置的共享文件夹：mount -t vboxsf share /mnt/share/
+		也要设置ip地址才能生效。编辑vi /etc/network/interfaces 然后重启网络/etc/init.d/networking restart
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 20180108:
 	【parted 分区sdb块设备，mkfs.ext4格式化，挂载在/opt上 https://www.cnblogs.com/zhangpengme/archive/2011/12/29/2305963.html】
@@ -570,3 +576,101 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
 		@是否放在内核空间的一些经验：1、如果需要与大量低速设备通信，并且性能要求一般，可以尝试放在用户模式，如果有时间性要求，就放在内核。2、如果程序需要用到内核API的服务、访问内核变量和中断处理有关，那么一般放在内核空间。 3、如果代码所做的工作大部分是策略而不是机制，用户空间可能更好。4、如果内核需要调用程序的服务，可能就要放到内核中。5、在内核中不容易做浮点运算，但是在用户空间可以使用FPU（floating-point unit）指令。
 		
 		【有一个基于ARM9-S3C3410的网络收音机 http://www.eeworld.com.cn/mcu/article_2017091134326.html 】
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+20180109：跟踪系统调用：strace data 2>&1 | grep open 【重定向：错误输出也定向到标准输出】，也可以 strace -e trace=open data
+	export 理解为定义环境列表的变量，在当前进程中可用。
+	会话：一组进程组（任务）
+	伪终端：一组相互连接的虚拟设备，主从设备，之间有一条IPC信道，供数据双向传递。
+	《linux/unix系统编程手册》
+	第三章：系统编程概念
+		GUN C 语言函数库glibc，用ldd myprog | grep libc可以查看程序链接库的版本
+    
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+20180110：学习宋宝华的联系代码。https://github.com/liuzhiping1/training 【宝华的笔记，可以节约我好多时间，如获至宝】
+	shell：
+		getopts h:ms option 判断命令行选项‘-’后是否为h或ms，没有参数就option为？，有的话实际参数给特殊变量OPTARG，特殊变量OPTIND是下一个参数的索引，初始为1
+		shift： 位置参数左移
+	backtrace：http://www.linuxidc.com/Linux/2012-11/73470.htm  追踪函数调用堆栈以及定位段错误
+	proc_create_data函数（./include/linux/proc_fs.h） 【通过这个在linux下找更快： find -name "*" | xargs grep proc_create_data 2>/dev/null】
+	【linux中面向对象的思想非常到位，定义数据和方法，高内聚和低耦合】
+	【内核代码的头文件包含都在linux文件夹中如‘#include <linux/types.h>’，应用程序的还有平台的路径】
+	makefile： 用"define func  ...  endef "来定义模块，用$(call func)来调用
+	http://www.jobbole.com/  伯乐资源，里面东西还挺多的
+	https://github.com/jobbole/ 史上最全的开发和设计资源大全
+	LD_PRELOAD：用于动态库的加载的环境变量，加载顺序为LD_PRELOAD>LD_LIBRARY_PATH>/etc/ld.so.cache>/lib>/usr/lib
+	mount 的 -t 指定文件类型，【见man】 在 cat /proc/filesystems 里面有
+	设置主机环境：【见/training/env/setup-embedded-host.readme】
+		(1)  SSH server:
+			sudo apt-get install openssh-server
+			sudo /etc/init.d/ssh stop
+			sudo /etc/init.d/ssh start
+		
+		(2)  NFS server:
+			sudo apt-get install nfs-kernel-server
+			
+			打开/etc/exports文件，在末尾加入：
+			/home/baohua *(rw,sync,no_root_squash)
+			注：nfs允许挂载的目录及权限，在文件/etc/exports中进行定义，各字段含义如下：
+			/home/xgc：要共享的目录
+			* ：允许所有的网段访问
+			rw ：读写权限
+			sync：资料同步写入内在和硬盘
+			no_root_squash：nfs客户端共享目录使用者权限
+			重启服务：
+			#sudo service nfs-kernel-server restart
+			#showmount -e
+			现在可以在本机上试一下：
+			#sudo mount -t nfs localhost:/home/baohua /mnt
+			#sudo umount /mnt
+			如果用在嵌入式设备上挂载，要加上参数-o nolock
+		
+		(3)  tftp server:
+		
+			1.安装tftp-server
+			sudo apt-get install tftpd-hpa
+			sudo apt-get install tftp-hpa(如果不需要客户端可以不安装)
+			tftp-hpa是客户端
+			tftpd-hpa是服务器端
+			
+			2.配置TFTP服务器
+			sudo vim /etc/default/tftpd-hpa
+			将原来的内容改为:
+			TFTP_USERNAME="tftp"
+			TFTP_ADDRESS="0.0.0.0:69"
+			TFTP_DIRECTORY="tftp根目录" #服务器目录,需要设置权限为777,chomd 777
+			TFTP_OPTIONS="-l -c -s"
+			
+			3.重新启动TFTP服务
+			sudo service tftpd-hpa restart
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+20180111：写LCD段码驱动TM1723
+	芯片与mcu用spi串口通信，集成段码输出IO、PWM0~3输出、按键4X3读入。
+	芯片级驱动 与 显示按键级驱动分层。
+	将段码逻辑转化成资源文件resource.txt,然后在写成头文件，具体逻辑C实现用相关宏即可。
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+20180112：
+readelf -S  Displays the information contained in the file's section headers
+strace ./a.out 1>&log
+strace ./a.out >log 2>&1 【strace是一个必不可少的 调试工具，strace用来监视系统调用。你不仅可以调试一个新开始的程序，也可以调试一个已经在运行的程序（把strace绑定到一个已有的PID上 面）。starce 的另一个用处是解决和动态库相关的问题】
+int is_little_endian(void)
+{
+        unsigned short flag=0x4321;
+
+        if(*(unsigned char*)&flag==0x21)
+                return 1;
+        else
+                return 0;
+}//字节顺序按照右低左高的就是小端。
+if(signal(SIGINT,sigHandler) == SIG_ERR) --信号处理器
+key_t ftok( const char * fname, int id ) --系统建立IPC通讯 （消息队列、信号量和共享内存） 时必须指定一个ID值。通常情况下，该id值通过ftok函数得到。
+ pid_t wait (int * status); --wait()会暂时停止目前进程的执行，直到有信号来到或子进程结束
+ atoi --atoi, atol, atoll - convert a string to an integer
+ ----------------------------------------------------------------------------------------------------------------------------------------------------------
+ 20180115:编译qemu虚拟机，http://blog.csdn.net/linyt/article/details/42504975   https://jingyan.baidu.com/article/f00622281253e8fbd3f0c814.html
+ 安装前需要的工具：
+ sudo apt-get install autoconf automake libtool 【这个没装会报错】
+ sudo apt-get install zlib1g-dev
+sudo apt-get install libglib2.0-0
+sudo apt-get install libglib2.0-dev
+配置内核：versatile_defconfig 这个常用 ：make versatile_defconfig ARCH=arm
+这个也用make CROSS_COMPILE=arm-linux-gnueabi- ARCH=arm vexpress_defconfig

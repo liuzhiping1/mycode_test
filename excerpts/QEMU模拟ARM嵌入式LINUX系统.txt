@@ -1,0 +1,264 @@
+QEMU模拟ARM嵌入式LINUX系统听语音
+|浏览：274|更新：2017-02-11 12:45
+使用QEMU模拟器在Ubuntu下模拟ARM嵌入式Linux操作系统，全程讲解说明。
+
+工具/原料
+QEMU模拟器安装：sudo apt-get install qemu
+交叉编译工具链安装：sudo apt-get install gcc-4.7-arm-linux-gnueabi
+uboot源码下载：git clone git://git.denx.de/u-boot.git ~/arm_qemu/uboot
+Linux内核源码下载：git clone http://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable.git ~/arm_qemu/kernel
+busybox源码下载：git clone git://busybox.net/busybox.git ~/arm_qemu/busybox
+u-boot-tools工具安装：sudo apt-get install u-boot-tools
+Ubuntu13.10（64位，3.13.6内核）
+方法/步骤
+0.准备工作
+
+首先，在$HOME目录下创建arm_qemu目录，用于存放“工具/原料”提及的源码包等：
+
+mkdir ~/arm_qemu
+
+接下来按“工具/原料”里面说明的命令执行后同步相关源码包和安装相关工具。
+
+安装好交叉编译链后还需要做如下处理，即创建链接（为什么创建，可以了解下编译脚本）： 
+
+sudo ln -s /usr/bin/arm-linux-gnueabi-gcc-4.7 /usr/bin/arm-linux-gnueabi-gcc 
+
+sudo ln -s /usr/bin/arm-linux-gnueabi-gcc-ar-4.7 /usr/bin/arm-linux-gnueabi-gcc-ar 
+
+sudo ln -s /usr/bin/arm-linux-gnueabi-gcc-nm-4.7 /usr/bin/arm-linux-gnueabi-gcc-nm 
+
+sudo ln -s /usr/bin/arm-linux-gnueabi-gcc-ranlib-4.7 /usr/bin/arm-linux-gnueabi-gcc-ranlib 
+
+sudo ln -s /usr/bin/arm-linux-gnueabi-cpp-4.7 /usr/bin/arm-linux-gnueabi-cpp 
+
+sudo ln -s /usr/bin/arm-linux-gnueabi-gcov-4.7 /usr/bin/arm-linux-gnueabi-gcov 
+
+即把所有尾部有4.7版本号的链接为没有的。
+
+1.配置Kernel 
+
+这里使用最常用的versatile_defconfig，具体步骤如下： 
+
+cd ~/arm_qemu/kernel 
+
+make versatile_defconfig ARCH=arm 
+
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- 
+
+进入Kernel源码目录，生成根目录下.config配置文件（arm架构），使用交叉编译工具链（以arm-linux-gnueabi-为前缀）编译versatile配置的内核。
+
+编译完成后，我们使用qemu试下： 
+
+qemu-system-arm -M versatilepb -kernel arch/arm/boot/zImage -nographic 
+
+其中-M指定模拟的设备型号，这里是versatile的pb版设备，-kernel对应启动程序，这里是编译好的Linux内核，-nographic表示直接将输出到当前终端。 
+
+运行后有如下输出： 
+
+pulseaudio: set_sink_input_volume() failed 
+
+pulseaudio: Reason: Invalid argument 
+
+pulseaudio: set_sink_input_mute() failed 
+
+pulseaudio: Reason: Invalid argument Uncompressing Linux… done, booting the kernel. 
+
+此时一直停住，没其他输出了，肯定是调试串口配置不正确。
+
+此时先按CTRL+A组合键并且放手后再按X键退出QEMU。
+
+接下来修改.config文件，将
+
+CONFIG_CMDLINE=”root=1f03 mem=32M”
+
+修改为
+
+CONFIG_CMDLINE=”console=ttyAMA0 root=1f03 mem=32M”
+
+保存后重新编译内核再次执行上面的qemu命令，运行后会出现如下错误： 
+
+VFS: Cannot open root device “1f03” or unknown-block(31,3): error -6 Please append a correct “root=” boot option; here are the available partitions: 1f00 65536 mtdblock0 (driver?) Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(31,3) 
+
+后面还有一串，从该句提示看出是没有根文件系统被挂载，很正常，我们没有指定使用的根文件系统啊，接下来我们使用Busybox来制作一个吧。
+
+2.配置Busybox 
+
+在上面的CONFIG_CMDLINE中可以看到root=1f03这句吧，root=是用于指定使用的根文件系统，而我们接下来就是使用Busybox这个工具来辅助我们构建根文件系统的根基，将其静态编译成一个可执行文件，这样就不需要再考虑库的依赖问题，该工具能支持很多Linux下的命令，并且可以自由配置其支持情况，接下来还是动手吧：
+
+ cd ~/arm_qemu/busybox/ 
+
+生成默认配置： 
+
+make defconfig ARCH=arm 
+
+配置生成静态文件： 
+
+make menuconfig 
+
+在弹出的操作界面中将Busybox Settings —> Build Options —> [ ] Build BusyBox as a static binary (no shared libs)选中，让[ ]变成[*]，保存退出后再执行如下命令进行编译： 
+
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- install 
+
+编译完成后，会在当前目录下生成_install目录，我们进入该目录并进行打包操作： 
+
+cd _install find . | cpio -o -H newc | gzip -9 > ../../rootfs.gz 
+
+接下来用qemu加载运行看看：
+
+cd ~/arm_qemu/ 
+
+qemu-system-arm -m 128M -M versatilepb -kernel kernel/arch/arm/boot/zImage -nographic -initrd rootfs.gz -append “console=ttyAMA0 root=/dev/ram rdinit=/bin/sh” 
+
+运行后我们可以看到/ #，此时就可以在其后面狂输命令了，但是发现在执行ps和mount命令有如下提示： 
+
+/ # ps 
+
+PID USER TIME COMMAND 
+
+ps: can’t open ‘/proc’: No such file or directory 
+
+/ # mount 
+
+random: nonblocking pool is initialized mount: no /proc/mounts 
+
+再加上我们需要使用到mdev工具，故而需要对/proc和/sys这两个fs进行挂载：
+
+mkdir /proc 
+
+mount -t proc none /proc 
+
+mkdir /sys 
+
+mount -t sysfs none /sys 
+
+mdev -s 
+
+执行完这些命令后ps和mount命令都可以使用了，故而接下来修改_install并重新打包下： 
+
+cd ~/arm_qemu/busybox/_install/ 
+
+mkdir proc sys dev etc etc/init.d 
+
+然后在_install目录的etc/init.d/目录下创建rcS文件，文件内容如下：
+
+#!/bin/sh 
+
+mount -t proc none /proc 
+
+mount -t sysfs none /sys 
+
+/sbin/mdev -s
+
+然后修改该文件可执行权限：
+
+chmod +x etc/init.d/rcS 
+
+修改好后，重新执行如下命令打包下根文件系统吧： 
+
+find . | cpio -o -H newc | gzip -9 > ../../rootfs.gz 
+
+回到arm_qemu目录重新运行下qemu吧，看看ps和mount能不能在启动后使用了，注意命令要改为：
+
+qemu-system-arm -m 128M -M versatilepb -kernel kernel/arch/arm/boot/zImage -nographic -initrd rootfs.gz -append “console=ttyAMA0 root=/dev/ram rdinit=/sbin/init” 
+
+区别在最后的rdinit，现在是/sbin/init，该程序在启动后运行，其运行后会去运行rcS文件。 
+
+3.配置Uboot 
+
+有了上面的kernel和rootfs部分，还差基本的bootloader，这3样东西齐了之后就可以构成最基本的ARM嵌入式Linux环境，即实现uboot引导后加载运行kernel，最终挂载rootfs并运行其上的程序，所以接下来对uboot进行操作吧： 
+
+cd ~/arm_qemu/uboot/ 
+
+修改versatilepb对应的配置文件include/configs/versatile.h，将如下内容：
+
+#define CONFIG_BOOTARGS "root=/dev/nfs mem=128M ip=dhcp "\                        "netdev=25,0,0xf1010000,0xf1010010,eth0 "\                        
+
+                 "console=ttyAMA0,38400n1"
+
+修改为：
+
+#define CONFIG_BOOTCOMMAND \
+
+        "sete ipaddr 10.0.2.15;"\
+
+        "sete serverip 10.0.2.2;"\
+
+        "set bootargs 'console=ttyAMA0,115200 root=/dev/ram mem=128M rdinit=/sbin/init';"\
+
+        "tftpboot 0x00007fc0 uImage;"\
+
+        "tftpboot 0x00807fc0 rootfs.img;"\
+
+        "bootm 0x7fc0 0x807fc0"  
+
+#define CONFIG_INITRD_TAG 1 
+
+#define CONFIG_ARCH_VERSATILE_QEMU 1
+
+上面配置使用了qemu自带的tftp服务，可在http://qemu.weilnetz.de/qemu-doc.html了解其ip地址规则。 
+
+接下来执行如下命令进行配置和编译：
+
+make versatilepb_config ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- 
+
+make ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- 
+
+uboot编译好后，接下来我们制作相应的kernel和rootfs： 
+
+cd ../kernel/ 
+
+make uImage ARCH=arm CROSS_COMPILE=arm-linux-gnueabi- 
+
+编译完成后可以看到如下输出： 
+
+Image Name: Linux-3.15.0-rc7 
+
+Created: Sat May 31 16:49:19 2014 Image 
+
+Type: ARM Linux Kernel Image (uncompressed) 
+
+Data Size: 2021008 Bytes = 1973.64 kB = 1.93 MB 
+
+Load Address: 00008000 
+
+Entry Point: 00008000 
+
+Image arch/arm/boot/uImage is ready 
+
+我们可以看到其加载地址与我们在uboot里配置的是一致的，接下来是rootfs： 
+
+cd .. 
+
+mkimage -A arm -O linux -T ramdisk -C none -a 0x00808000 -e 0x00808000 -n ramdisk -d rootfs.gz rootfs.img 
+
+运行后有如下输出：
+
+Image Name: ramdisk 
+
+Created: Sat May 31 16:53:18 2014 
+
+Image Type: ARM Linux RAMDisk Image (uncompressed) 
+
+Data Size: 1115833 Bytes = 1089.68 kB = 1.06 MB 
+
+Load Address: 00808000 
+
+Entry Point: 00808000 
+
+接下来把kernel和rootfs放到创建的tftp目录下： 
+
+mkdir tftp 
+
+cp kernel/arch/arm/boot/uImage tftp/ 
+
+cp rootfs.img tftp/ 
+
+至此，一切准备就绪，运行如下命令吧： 
+
+qemu-system-arm -M versatilepb -kernel uboot/u-boot -m 256M -net nic -net user,tftp=/home/xinu/arm_qemu/tftp -nographic 
+
+运行起来后，可以先看到uboot运行，然后通过tftp下载kernel和rootfs，然后把kernel启动并挂载rootfs，最后仍可以看到/ #这一美丽的符号。
+
+4.后述 
+
+在本文中采用ramdisk来作为rootfs，而在PC发行版的Linux里会挂载ramdisk并运行其中的initrd，然后才切换到真正的rootfs，故而在这里不要产生概念模糊。

@@ -31,6 +31,8 @@ ldd
 netstat
 ping
 traceroute 显示数据包到主机的距离
+nm 
+readelf
 4、硬件管理
 lsusb 显示usb设备列表信息
 arch 显示当前主机硬件架构类型
@@ -61,3 +63,5 @@ df -l
 fdisk /dev/sdb
 parted /dev/sdb  功能更强大 ，然后输入print list
 dd if=   of=    转换文件-convert and copy a file
+ldd myprog | grep libc    -- print shared object dependencies
+showmount - show mount information for an NFS server
