@@ -1,3 +1,4 @@
+https://jingyan.baidu.com/article/f00622281253e8fbd3f0c814.html
 QEMU模拟ARM嵌入式LINUX系统听语音
 |浏览：274|更新：2017-02-11 12:45
 使用QEMU模拟器在Ubuntu下模拟ARM嵌入式Linux操作系统，全程讲解说明。

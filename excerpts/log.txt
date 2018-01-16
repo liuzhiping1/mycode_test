@@ -674,3 +674,87 @@ sudo apt-get install libglib2.0-0
 sudo apt-get install libglib2.0-dev
 配置内核：versatile_defconfig 这个常用 ：make versatile_defconfig ARCH=arm
 这个也用make CROSS_COMPILE=arm-linux-gnueabi- ARCH=arm vexpress_defconfig
+Ubuntu：
+sudo apt-get insatll ncurses-dev
+这个教程挺好的：http://blog.csdn.net/aggresss/article/details/74834155 虚拟机就是开发板
+set：shell的变量，env：用户环境变量，export：将shell变量export到用户变量
+【**】ubuntu shell 下默认的脚本解析器是dash, 会使一些bash脚本执行失败，通过如下方式改回bash:sudo dpkg-reconfigure dash 
+http://blog.csdn.net/h002399/article/details/44940777  linux下的路由表详解【重要】
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+20180116： 接着昨天路由的学习
+@规则（rule）
+
+　　规则是策略性的关键性的新的概念。我们可以用自然语言这样描述规则，例如我门可以指定这样的规则：
+
+　　规则一：“所有来自192.16.152.24的IP包，使用路由表10， 本规则的优先级别是1500”
+
+　　规则二：“所有的包，使用路由表253，本规则的优先级别是32767”
+
+　　我们可以看到，规则包含3个要素：
+
+　　什么样的包，将应用本规则（所谓的SELECTOR，可能是filter更能反映其作用）；
+
+　　符合本规则的包将对其采取什么动作（ACTION），例如用那个表；
+
+　　本规则的优先级别。优先级别越高的规则越先匹配（数值越小优先级别越高）。
+@相关命令：route【Gateway	网关地址，”*” 表示目标是本主机所属的网络，不需要路由】
+			# route  [add|del] [-net|-host] target [netmask Nm] [gw Gw] [[dev] If] 
+						add : 添加一条路由规则
+                       del : 删除一条路由规则
+                       -net : 目的地址是一个网络
+                       -host : 目的地址是一个主机
+                       target : 目的网络或主机
+                       netmask : 目的地址的网络掩码
+                       gw : 路由数据包通过的网关
+                       dev : 为路由指定的网络接口
+		route 命令使用举例
+			添加到主机的路由
+			
+			# route add -host 192.168.1.2 dev eth0:0
+			# route add -host 10.20.30.148 gw 10.20.30.40
+			添加到网络的路由
+			
+			# route add -net 10.20.30.40 netmask 255.255.255.248 eth0
+			# route add -net 10.20.30.48 netmask 255.255.255.248 gw 10.20.30.41
+			# route add -net 192.168.1.0/24 eth1
+			添加默认路由
+			
+			# route add default gw 192.168.1.1
+			删除路由
+			
+			# route del -host 192.168.1.2 dev eth0:0
+			# route del -host 10.20.30.148 gw 10.20.30.40
+			# route del -net 10.20.30.40 netmask 255.255.255.248 eth0
+			# route del -net 10.20.30.48 netmask 255.255.255.248 gw 10.20.30.41
+			# route del -net 192.168.1.0/24 eth1
+			# route del default gw 192.168.1.1
+		# sysctl -w net.ipv4.ip_forward=1 设置包的转发 
+		# sysctl  net.ipv4.ip_forward 查看当前系统是否支持转发 
+		【	# sysctl reads settings from the following locations:
+			#   /boot/sysctl.conf-<kernelversion>
+			#   /lib/sysctl.d/*.conf
+			#   /usr/lib/sysctl.d/*.conf
+			#   /usr/local/lib/sysctl.d/*.conf
+			#   /etc/sysctl.d/*.conf
+			#   /run/sysctl.d/*.conf
+			#   /etc/sysctl.conf 】
+	当一个主机不支持策略路由时，它只使用了两个路由表，一个是ip_fib_local_table，用于本地，另一个是ip_fib_main_table，用于接发。只有在查找ip_fib_local_table表时没有找到匹配的路由（不是发给本地的）它才会去查找ip_fib_main_table。当一个主机支持策略路由时，它就有可能存在着多个路由表，因而路由表的选择也就是查找的一部分。路由表的选择是由策略来确定的，而策略则是由应用（用户）来指定的，如能过ip rule命令：
+ip rule add from 10.1.1.0/24 table TR1	
+ip rule add iff eth0 table RT2
+
+@如上，第一条命令创建了基于源地址路由的一条策略，这个策略使用了RT1这个路由表，第二条命令创建了基于数据包入口的一个策略，这个策略使用了RT2这个路由表。当被指定的路由表不存在时，相应的路由表将被创建。
+步骤一：设置各个网络接口的IP，和默认网关：
+ip addr add 172.16.100.1/24 dev eth1
+ip route add default via a.b.c.d dev eth1
+其它接口IP的设置和第一个接口一样，这时，如果没有其它设置，则所有的数据通过这个默认网关路由出去。
+步骤二：使子网172.16.10.0/24可以通过gw2路由出去
+ip route add 172.16.10.0/24 via e.f.g.h dev eth2
+步骤三：添加一个路由表
+echo “250 HS_RT” >> /etc/iproute2/rt_tables
+步骤四：使用策略路由使192.168.1.0/24网段的主机可以通过e.f.g.h这个网关上网
+ip rule add from 192.168.1.0/24 dev eth0 table HS_RT pref 32765
+ip route add default via e.f.g.h dev eth2
+iptables –t nat –A POSTROUTING –s 192.168.1.0/24 –j MASQUERADE
+步骤五：刷新路由cache，使新的路由表生效
+ip route flush cache
+这样就可以实现了以上要求的策略路由了，并且可以通过traceroute工具来检测上面的设置是否能正常工作。
