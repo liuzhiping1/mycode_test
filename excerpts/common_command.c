@@ -65,3 +65,4 @@ parted /dev/sdb  功能更强大 ，然后输入print list
 dd if=   of=    转换文件-convert and copy a file
 ldd myprog | grep libc    -- print shared object dependencies
 showmount - show mount information for an NFS server
+seq 打印数的序列

@@ -1,0 +1,54 @@
+这一期来了解一下Ralink的RT3052芯片，也许在做产品开发的人会不屑于这么陈旧的芯片，但是当你了解了MT7688或者MT7621之后就会发现，这些芯片的核心思想和开发方式都是不变的，差别就是各项参数的提高，细微的功能增加和删减。Ralink在被MTK收购前风格也和MTK很相近，都是基于Turnkey的原则设计芯片。SOC，Demoboard，SDK，各种一站式服务。所以可以看到，那些半路出道作路由器的厂家，比如360，小米，联想，都是清一色的MTK方案，Atheros，Broadcom，Realtek根本不考虑，原因就是MTK的芯片开发周期短。
+        基于芯片级别的了解知识时，各种论坛博客和搜索就捉襟见肘了，最好的方法就是拿着芯片的Datasheet细细的读，在SDK的DataSheet目录下 RT3050_5x_V2_Bookmarked.pdf 就是RT3052的Datasheet，我在官方的版本上修改了目录结构，方便大家阅读。
+
+
+
+
+
+     上图贴出了RT3052的Functional Block Diagram ，在理解这张图之前先来了解一些概念，其实路由器的架构都是相同的：RF(Radio Frequecy)、BBP(Base Band Processor)、AP(Application Processor)三部分，再加上外设(Peripheral)，就这四个部分就可以把路由器说清楚。
+        RF射频部分的功能主要是射频接收和发射，这部分性能好坏的区别主要是：路由器信号的好坏、会不会掉线、辐射这些。一个好的射频模块是可以根据信号的强弱调制辐射水平的，信号好的时候就降低发射功率来降低辐射，信号差的时候就提高发射功率来保证通信质量。国产路由器喜欢大天线，一个路由器恨不得8根天线，其实80%的比重在于RF芯片和电路设计的好坏。
+        BBP基带模块就重要了，大家通常说的OFDM，CCK，DSSS，MIMO-OFDM这些的主要区别就在这里，大家常说调制解调方式都是指的BB模块。因为基带就是对RF射频模块接收到了信号进行处理，所以基带就和通信协议关系最大。通信协议里面就包括了调制方式、编码方式和其他协议。对于路由芯片厂商来说，从802.11g升级到802.11n，只需要更换BB基带模块就可以了。应该说BBP模块还是很重要的，直接关系到信号接收和发送的效率。
+        AP应用程序处理器模块其实就是CPU模块，最老的路由器是比较忽视AP模块的，因为最老的路由器除了用来上网几乎没有什么其他功能。而现在刚好相反了，现在的路由器已经逐渐成为一台小型的家用服务器。AP模块的性能完全可以用描述CPU的方法来描述，路由器由于功耗的原因一般采用的都是MIPS内核的处理器(ARM也开始占领这方面市场了)。衡量AP模块的主要指标包括：架构、指令集、主频、CPU和内存交换信息的总线带宽等。现在高端路由器的普通路由器的主要区别在这个模块，毕竟1GHz的cpu和400MHz的cpu在性能上还是有很大区别的。其实这个模块最好理解，就是一台电脑的性能。
+        外设就比较简单了，包括摄像头、GPS定位模块、蓝牙模块、重力感应模块、语音模块等等。路由器芯片提供IIC，IIS，SPI，URAT，USB，PCM，GPIO等标准的接口，各种信号的路由器根据这些接口添加各种外设，只有你想不到的，没有集成不到一块的，尤其现在IOT的概念兴起，将来的路由器会和各种各样你想不到的外设联系起来。
+        路由器的控制就是通过机器指令对各种外设的控制和信号的收发，所有的控制单元在CPU这都被抽象成一段内存地址（或者叫寄存器地址），所有的操作几乎都是一个模式，就是对寄存器的操作（读或者写）。
+        OK，返回说RT3052的Datasheet，整篇分为四个章节：
+            1. Pin Description
+            2 Maximum Ratings and Operating Conditions
+            3. Function Description
+            4. Package Physical Dimension
+        对于软件开发主要看的就是第三章。
+            3.1 Overview
+            3.2 Memory Map Summary
+            3.3 MIPS 24KEc Processor
+            3.4 System Control
+            3.5 Timer
+            3.6 Interrupt Controller
+            3.7 UART
+            3.8 UART Lite
+            3.9 Programmable I/O
+            3.10 I2C Controller
+            3.11 SPI Controller
+            3.12 Generic DMA Controller
+            3.13 PCM Controller
+            3.14 I2S Controller
+            3.15 Memory Controller
+            3.16 NAND Flash Controller
+            3.17 Frame Engine
+            3.18 Ethernet Switch
+            3.19 USB OTG Controller & PHY
+            3.20 802.11n 2T2R MAC/BBP
+        第三章的每一节的结构都是相同的，一般都分三个部分，第一节讲功能模块的特性，第二节讲功能模块的原理，第三节就是寄存器描述。
+        限于篇幅原因，我只拿最简单的GPIO模块来进行分析，其他的可以触类旁通。RT3052最多可支持52个GPIO口，但大多数GPIO与SDRAM, PCI, MDIO, JTAG, UART-Lite, UART, SPI, PCM ,
+I2C是复用的口，也就是说如果你启用了I2C，那对应引脚的GPIO功能就没有了。决定这个引脚是否用于GPIO在 3.4节 system control 中有说明。GPIO在这个芯片里被分成了三组：0-23；24-39；40-51;每组GPIO对应10个寄存器：
+        0x00 _INTinterrupt status
+            0x04 _EDGEedge status
+            0x08 _RENArising edge interrupt enable
+            0x0C _FENAfalling edge interrupt enable
+            0x20 _DATAdata
+            0x24 _DIRdirection
+            0x28 _POLpin polarity
+            0x2C _SETset PIO data bit
+            0x30 _RESETclear PIO data bit
+            0x34 _TOGtoggle PIO data bit
+        举个例子，操作GPIO01，如果只想将GPIO置高或拉低，前4个寄存器都是中断相关这里用不到，需要将GPIO设置为输出口，将0x24 _DIR寄存器相应的位置1，然后通过对 0x2c,0x30,0x34相应的位置1来对GPIO进行置1，置0和反转操作。
+        芯片的DataSheet就是这样，像本字典，不用都看，但要会查。当然想要游刃有余的看Datasheet还需要你对各种标准接口特性有一个熟练的掌握，大体说到这里，关键还是多实践。

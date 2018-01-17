@@ -1,0 +1,4 @@
+ 第五期 Jlink调试路由器 《路由器就是开发板》  详见 ：  http://blog.csdn.net/aggresss/article/details/52337449
+ 如果第四期提到的你都做完啦，而且还满怀希望的看第五期，那真真是极好的。这一节我们就让路由器动起来，并且验证第四期的飞线是否成功。
+如果你没有Jlink调试器可以跳到下一期，使用Wiggler或者自制Wiggler调试器。
+        HG255d的CPU属于MIPS架构，而Jlink调试器是我当年学习ARM时买的，大家都说Jlink只能调试ARM，但有一次用Jlink官方的工具时无意间发现了MIPS的身影，如下图所示，试验了一下发现使用官方的软件调试hg255d还是行不通的，但是使用OpenOCD还是可以的。

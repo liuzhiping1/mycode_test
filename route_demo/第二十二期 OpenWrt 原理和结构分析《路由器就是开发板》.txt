@@ -1,0 +1,86 @@
+这一期我们来真正的接触OpenWrt，这个接触是从源码方面的，不是刷机后通过web登录配置的那种。Wrt(Wireless RouTer)的历史和文化大家可以自行搜索一下，很有趣的。
+        当Linksys释放 WRT54G/GS 的源码后，网上出现了很多不同版本的 Firmware 去增强原有的功能。大多数的 Firmware 都是99%使用 Linksys的源码，只有1%是加上去的，每一种 Firmware 都是针对特定的市场而设计，这样做有两个缺点：第一个是难以集合各版本Firmware的长处；第二个是这版本距离 Linux 正式发行版越来越远。OpenWrt 选择了另一条路，它从零开始，一点一点的把各软件加入进去，使其接近 Linksys 版 Firmware的功能，而OpenWrt 的成功之处是它的文件系统是可写的，开发者无需在每一次修改后重新编译，令它更像一个小型的 Linux 电脑系统。所有我们可以这样理解，OpenWrt不是一个路由器固件，而是一种linux的发行版，和Ubuntu或者Fedora一样，当然，我觉得它的风格更像ArcLinux。OpenWrt作为linux发行版理解的话，它的一个特点就是大多运行在哑设备上(就是没有直接显示设备的设备)。
+        在OpenWrt的官网 http://wiki.openwrt.org/ 上可以了解到很多与其相关的基础知识， http://wiki.openwrt.org/doc/start 这个是文档入口，很详细。
+        先从获取代码开始，这里以15.05版本为例，使用git工具获取源码：  git clone git://git.openwrt.org/15.05/openwrt.git  
+        源码下载成功后在目录下会生成十几个文件夹，这些文件夹的作用在下面列出：
+OpenWrt源码目录结构：
+tools和toolchain目录：包含了一些通用命令, 用来生成固件, 编译器, 和C库.
+build_dir/host目录：是一个临时目录, 用来储存不依赖于目标平台的工具.
+build_dir/toolchain-目录：用来储存依赖于指定平台的编译链. 只是编译文件存放目录无需修改.
+build_dir/target-目录：用来储存依赖于指定平台的软件包的编译文件, 其中包括linux内核, u-boot, packages, 只是编译文件存放目录无需修改.
+staging_dir目录：是编译目标的最终安装位置, 其中包括rootfs, package, toolchain.
+package目录：软件包的下载编译规则, 在OpenWrt固件中, 几乎所有东西都是.ipk, 这样就可以很方便的安装和卸载.
+target目录：目标系统指嵌入式设备, 针对不同的平台有不同的特性, 针对这些特性, "target/linux"目录下按照平台进行目录划分, 里面包括了针对标准内核的补丁, 特殊配置等.
+bin目录：编译完OpenWrt的二进制文件生成目录, 其中包括sdk, uImage, u-boot, dts, rootfs构建一个嵌入式系统完整的二进制文件.
+config目录：存放着整个系统的的配置文件.
+docs目录：里面不断包含了整个宿主机的文件源码的介绍, 里面还有Makefile为目标系统生成docs.
+include目录：里面包括了整个系统的编译需要的头文件, 但是是以Make进行连接的.
+feeds目录：扩展软件包索引目录.
+feeds/packages目录：为执行./scripts/feeds install 之后的package。
+scripts目录：组织编译整个OpenWrt的规则.
+tmp目录：编译文件夹, 一般情况为空.
+dl目录：所有软件的下载目录, 包括u-boot, kernel.
+logs目录：如果编译出错, 可以在这里找到编译出错的log.
+
+
+        我这里介绍一下OpenWrt相关的两个概念feeds和buildroot，同时它们也是OpenWrt引进的两种构建和编译代码的机制，如果不了解这两个概念很容易搞得一头雾水。
+Feeds：
+        传统的Linux系统在安装或者编译某一个软件的时候，会检查其依赖库是否安装，如果没有安装，则会报错，安装或编译退出。这种机制使得开发者在安装一个软件之前，不得不查找该软件所需的依赖库，并手动去安装这些软件，有时候碰到比较娇贵的软件时，嵌套式的安装依赖文件，会使得开发者头昏脑涨。Openwrt通过引入feeds机制，较好的解决了这个问题。下文是Openwrt的官方wiki对于feeds的表述：
+        "In OpenWrt, a "feed" is a collection of packages which share a common location. Feeds may reside on a remote server, in a version control system, on the local filesystem, orin any other location addressable by a single name (path/URL) over a protocol with a supported feed method.Feeds are additional predefined package build recipes for OpenWrt Buildroot".
+        可以翻译为：在Openwrt系统中，“feed”是一系列的软件包，这些软件包需要通过一个统一的接口地址进行访问。“feed”软件包中的软件包可能分布在远程服务器上、在svn上、在本地文件系统中或者其他的地方，用户可以通过一种支持feed机制的协议，通过同一个地址进行访问。
+        我们下载的Openwrt源码是较为纯净的系统，feeds提供了我们在编译固件时所需的的许多额外扩展软件。我的理解是Feeds是OpenWRT环境所需要的软件包套件，它将一个或一组软件封装成一个feeds，这样做的好处就是OpenWrt成为了一个模块化的软件，如果我们想让它成为路由器就加载路由器相关的feeds，想让他成为读卡器就加载读卡器相关的feeds。比较重要的feeds有：pacakges，LuCI，routing，telephony，management，这些都是默认的可以通过修改feeds.conf.default文件进行配置。
+         如果你之前没有下载好这些套件，而是选择在编译的时候在线下载安装的话，一定要保证编译的时候是成功连接到互联网的，否则导致编译终端，出现“No More Mirrors Download”的错误很烦人的。为了避免其他的错误，还是在连接互联网的情况下来编译吧，编译的过程本来就很长了，再出现这些错误会抓狂的。
+下载之前可以通过查看更改feeds.conf.default这个文件来查看和选择相应的软件包。
+开始下载，使用命令：
+./scripts/feeds update -a
+接下来安装feeds包，只有安装之后，在make menuconfig的时候才能够对相关的配置进行修改：
+./scripts/feeds install -a
+如果更新了feeds的配置文件，需要添加新的软件包用于生成系统，只需要重复执行操作：
+./scripts/feeds update -a
+./scripts/feeds install -a
+将可使用的feeds列表配置在feeds.conf或者是feeds.conf.default，这个文件包含了feeds的列表，每一行由三个部分组成，feeds的方法，feeds的名字和feeds的源。
+下面是一个feeds.conf.default的例子：
+src-git packages https://github.com/openwrt/packages.git;for-15.05
+src-git luci https://github.com/openwrt/luci.git;for-15.05
+src-git routing https://github.com/openwrt-routing/packages.git;for-15.05
+src-git telephony https://github.com/openwrt/telephony.git;for-15.05
+src-git management https://github.com/openwrt-management/packages.git;for-15.05
+#src-git targets https://github.com/openwrt/targets.git
+#src-git oldpackages http://git.openwrt.org/packages.git
+#src-svn xwrt http://x-wrt.googlecode.com/svn/trunk/package
+#src-svn phone svn://svn.openwrt.org/openwrt/feeds/phone
+#src-svn efl svn://svn.openwrt.org/openwrt/feeds/efl
+#src-svn xorg svn://svn.openwrt.org/openwrt/feeds/xorg
+#src-svn desktop svn://svn.openwrt.org/openwrt/feeds/desktop
+#src-svn xfce svn://svn.openwrt.org/openwrt/feeds/xfce
+#src-svn lxde svn://svn.openwrt.org/openwrt/feeds/lxde
+#src-link custom /usr/src/openwrt/custom-feed
+下面是feeds支持的方法类型：
+src-bzr通过使用bzr从数据源的pxiaath/URL下载数据
+src-cpy通过从数据源path拷贝数据
+src-darcs通过使用darcs从数据源path/URL下载数据
+src-hg通过使用hg从数据源path/URL下载数据
+src-link创建一个数据源path的symlink
+src-svn通过使用svn从数据源path/URL下载数据
+
+
+Buildroot：
+          Buildroot是一个包含Makefile和修补程序(patch)的集合，这个集合可以使你很容易的为你的目标构建交叉工具链(cross-compilationtoolchain)，根文件系统(root filesystem)以及Linux内核映像(kernelimage)。Buildroot可以独立的实现其中的一个或几个功能。
+       Buildroot对于从事嵌入式系统(embeddedsystems)开发的人很有帮助。通常嵌入式系统使用的处理器(processor)同于在PC跑的x86架构的CPU。嵌入式系统可以使用IBM公司的PowerPC，可以是RISC指令的MIPS（包括龙芯II），也可以是ARM处理器，等等。
+       编译工具链(compilationtoolchain)是为你的操作系统编译程序的工具的集合。主要包括编译器(compiler)（比如说gcc），包括汇编器(assembler)和链接器(linker)的二进制工具集(binaryutils)（在我们的Linux系统中通常为binutils），C标准类库（比如GNU Libc、uClibc或者dietlibc）。
+       你用来做开发的电脑上安装的OS通常已经包含一个默认的编译工具链，通过它便已出来的程序可以在你的系统上运行。如果当你使用PC，你的编译工具链工作在x86架构的处理器上，产生的程序也是在x86处理器上使用的。在大多数Linux系统中，交叉工具链采用GNU libc(glibc)作为标准类库。这种编译工具链通常被称为“主机编译工具链(hostcompilation toolchain)”。你用来做开发工作的电脑上跑的系统被称作“主机系统(hostsystem)”。这个编译工具链由你的Linux发行版(distribution)的操作系统自带，而Buildroot则于你的操作系统无关（但使用Buildroot建立的交叉工具链和其他工具可以在你的主机系统执行）。
+       正如前面所述，编译工具链由你的系统所提供，运行在你的系统上，产生你系统所用处理器可以执行的代码文件。由于你的嵌入式系统的处理器通常与你的开发主机不同，你需要一个交叉编译工具链，这工具链运行在你的开发主机上，但产生你的嵌入式目标主机（目标处理器）的可执行代码。比如你的开发主机系统采用x86处理器，而你的嵌入式目标系统处理器是ARM的，普通的编译工具链在你的开发主机上只能产生x86处理器的执行代码，而交叉编译工具链则可以在你的开发主机上产生ARM处理器的可执行代码。
+       Buildroot自动使用所用可能用到的工具（比如busybox）构建根文件系统。与手动操作相比，更容易。
+       由于你可以手动使用gcc、binutils、uClibc和其他工具进行编译，你一定很好奇为什么非得用Buildroot这个工具呢。你当然可以使用手动设置，但处理每一个配置选项以及由gcc或binutils版本所产生问题都是非常耗时和无聊的。Buildroot通过使用Makefile自动处理这些问题，而且还对任一个gcc和binutils版本都有补丁集合以使得它可以在大多数Linux版本中工作。
+       此外，Buildroot里面提供了一个基础结构，用于再现你构建内核交叉工具链和嵌入式根文件系统的过程。当需要补丁、更新或当其他人接手这个项目时，构建过程能够重现是很有用处的。
+        OpenWrt的编译过程引入了Buildroot的机制，对于不同平台的host和target编译过程变得非常简单，Buildroot是一个开源的项目，https://buildroot.org/ 可以了解更多内容，OpenWrt对Buildroot进行了很多修改。Buildroot可以将我们嵌入式开发过程中遇到的几个关键节点一站式解决，包括：SDK，Toolchain，U-Boot，Kernel，Rootfs，Imagebuilder 等等。
+        关于OpenWrt的编译流程我们留到下一期讲解，这里我再讲一个常见的问题，我们通常查找文件使用windows自带的查找功能就能实现，但如果想要查找指定文件夹内所有文件包含的文字内容就需要使用专业一点的方法，这里来举出一些我常用的方法。比如，现在想在下载好的OpenWrt源码中找出包含"hg255d"关键字的文本内容。
+        在windows平台下，可以使用File Locator pro工具进行查找：
+
+        在linux平台下，可以使用下面的命令进行查找：
+        find . -name "*" |xargs grep -sin "hg255d"
+
+
+----------------------------------
+
+SDK下载地址：   https://github.com/aggresss/RFDemo

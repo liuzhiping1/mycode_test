@@ -1,0 +1,157 @@
+OpenOCD配置分析 《路由器就是开发板》这一节我们来说说OpenOCD。刚开始接触嵌入式硬件时只知道写程序，觉得调试根本不需要，随着时间的积累和问题复杂度的提升，才发现调试对于一个系统的重要性。生活中很多这样的例子，调试，永远都是事物良性发展过程中必不可少的一个环节，两个人过日子遇到了矛盾，静下来沟通就是调试，总不能一言不合就分手。在设计一个产品或者一个流程时，都要充分的考虑到调试因素，这样系统在运行过程中一旦出现了问题，可以及时的追溯。OpenOCD就是这样一个工具，配合JTAG调试协议，可以对硬件设备进行指令集级别和寄存器级别的调试。
+        了解一个新软件最好的方式就是读官方的Manual。当然，不一定非得从Manual开始，可以从一些实例开始，或者基于母语的博客或者论坛，但想掌握得更彻底，还是得找官方的文档，解铃还须系铃人。如果软件的设计思想过于复杂，Manual读一遍是不管用的。往往盘旋式的前进会收到更好的效果，也就是带着问题读Manual，解决了问题；再遇到一些问题时，再读一遍Manual，就这样反复几遍也就逐渐掌握了，所谓的一万小时理论也是基于此。
+为了让大家知道官方Manual的重要性，我还是基于对Manual的翻译来讲OpenOCD的配置和使用。http://openocd.net/ 可以下载到OpenOCD的一切。OpenOCD的文档做得比较有条理。
+        OpenOCD是Dominic Rath大神写论文时得到的灵感，在此奉劝还没写毕业论文的诸位认真的选题和创作。
+        The Open On-Chip Debugger (OpenOCD) aims to provide debugging, in-system programming and boundary-scan testing for embedded target devices.
+        刚一开始可能还摸不清OpenOCD的运作模式，毕竟它不是一款图形化得软件，而是基于command line 的交互方式。而且OpenOCD运行后直接就是一个Daemon，我第一次运行时还真有点懵。这种软件还是得靠动手操作实例来掌握。
+        使用OpenOCD开发项目，我们需要做的不止是将调试器连接到开发板，我们还需要配置OpenOCD让它知道我们的调试器和开发板的型号，可以使用OpenOCD连接GDB，然后使用例如Eclipse或者其它图形化的工具。
+先来理解一个概念--TAP:
+        Test Access Ports (TAPs) are the core of JTAG. TAPs serve many roles, including:
+          *Debug TargetA CPU TAP can be used as a GDB debug target.
+          *Flash ProgrammingSome chips program the flash directly via JTAG. Others do it indirectly, making a CPU do it.
+          *Program DownloadUsing the same CPU support GDB uses, you can initialize a DRAM controller, download code to DRAM, and then start running that code.
+          *Boundary ScanMost chips support boundary scan, which helps test for board assembly problems like solder bridges and missing connections.
+        通俗点讲，TAP就是一个调试链，通常一个芯片就是一个TAP，但是一个芯片往往包含多个IP核，比如，ARM+DSP或者ARM+FPGA或者ARM+ASIC，所以在这个chain里面通常会包含多个可调试对象，比如使用scan_chain命令显示的信息，可以看到omap5912下面包括3个可调试成员。
+
+
+
+        OpenOCD启动时将配置文件作为参数.
+        openocd.exe -f jlink.cfg -f openocd-ralink.cfg 命令就是将jlink.cfg和openocd-ralink.cfg两个配置文件作为配置参数，下面针对Openocd-ralink.cfg 每行做一个分析：
+
+[cpp] view plain copy
+<span style="font-size:14px;"><span style="font-size:18px;">################################################################  
+set  _CHIPNAME rt3052  #定义变量  
+set  _ENDIAN little     #定义变量  
+  
+#daemon configuration  
+telnet_port 4444    #定义telnet 端口 4444  
+gdb_port 3333       #定义GDB端口 3333  
+  
+#jtag_speed 0  
+adapter_khz 500      #适配器频率设置  
+set _CPUTAPID 0x1335024F   #设置 _CPUTAPID 变量  
+adapter_nsrst_delay 100     #设置 nsrst信号延迟  
+jtag_ntrst_delay 100        #设置 ntrst 信号延迟  
+  
+ #配置一个新的TAP 命名为 rt30xx  
+jtag newtap rt30xx cpu -irlen 5 -ircapture 0x1 -irmask 0x1f -expected-id 0x1305224f       
+  
+#为rt30xx的TAP建立一个cpu 叫 rt30xx.cpu  类型为mips_m4k little_endian   
+target create rt30xx.cpu mips_m4k -endian little -chain-position rt30xx.cpu       
+  
+#对建立好的cpu进行配置 reset-halt-post 事件时的处理方法  
+rt30xx.cpu configure -event reset-halt-post {  
+    #set memory  
+    mww 0x10000300 0xD1825272  
+    sleep 10  
+    mww 0x10000304 0xE0120600  
+    halt  
+}  
+  
+#对建立好的cpu进行配置 reset-init 事件时的处理方法  
+rt30xx.cpu configure -event reset-init {  
+    halt  
+    #set memory  
+    mww 0x10000300 0xD1825272  
+    sleep 1   
+    mww 0x10000304 0xE1110600  
+    sleep 10000                         ;# wait for lock  
+    halt  
+    sleep 1  
+    flash probe 0  
+}  
+  
+#用户自定义函数 ralink_init 对CPU进行初始化  
+proc ralink_init { } {  
+    halt  
+    sleep 10  
+    mww 0x10000300 0xD1825272  
+    sleep 1  
+    mww 0x10000304 0xE0120600       ;# Set Memory 32Mbyte in 32Bit(16MBx16bitx2)  
+    sleep 1                         ;# wait for lock  
+}  
+  
+#用户自定义函数 erase_uboot 将flash中U-Boot 区域擦除  
+proc erase_uboot { } {  
+flash probe 0  
+flash erase_sector 0 0 4  
+}  
+  
+#用户自定义函数 flash_uboot 将U-Boot写入flash  
+proc flash_uboot { } {  
+ralink_init  
+sleep 1  
+flash probe 0  
+flash write_bank 0 uboot.bin 0x0  
+}  
+  
+#用户自定义函数 flash_uboot 将U-Boot写入flash  
+proc run_uboot { } {  
+ralink_init  
+sleep 1  
+load_image uboot.bin 0x200000  
+resume 0x200000  
+}  
+  
+# setup working area somewhere in RAM  
+#rt30xx.cpu configure \  
+#   -work-area-phys  0xa0600000 \  
+#   -work-area-size 65536 \  
+#   -work-area-backup 0  
+  
+rt30xx.cpu configure -work-area-phys 0x00000000 -work-area-size 0x0010000  -work-area-backup 0  
+#rt30xx.cpu configure -work-area-phys 0xa0600000 -work-area-size 0x20000  -work-area-backup 0  
+#rt30xx.cpu configure -work-area-phys 0x00600000 -work-area-size 0x40000  
+# serial SPI capable flash  
+# flash bank <driver> <base> <size> <chip_width> <bus_width>  
+  
+#定义flash配置  
+flash bank rt30xx.flash cfi 0xbf000000 0x1000000 2 2  rt30xx.cpu  
+#flash probe 0  
+###########################################################</span></span>  
+        从上面的配置文件可以看出配置文件的几个配置要素
+        1. Daemon Configuration
+        2. Adapter Configuration
+        3. Reset Configuration
+        4. Tap Declaration
+        5. CPU Configuration
+        6. Flash Configuration
+        7. Project-Specific Utilities
+        将这个几个要素作为线索读官方手册里相应的内容，就能有一个系统的了解。
+        下面关注一下 OpenOCD 的相关命令 当利用telnet 或者 GDB 登录成功后，就可以通过自定义函数或者命令操作，将一些常用的命令列出来，方便查询。
+        1 Daemon Commands
+                1.1.exit  #退出
+                1.2.help#显示帮助信息
+                1.3.sleep (msec)#暂停 xx 毫秒
+                1.4.shutdown#关闭
+                1.5.debug_level  #设置和显示 debug 级别
+        2 Target State handling
+                2.1.reg#显示寄存器信息
+                2.2.halt (ms)   #暂停
+                2.3.resume (address)#重新运行
+                2.4.step#单步运行
+                2.5.reset (run halt init)   #重启
+        3 I/O Utilities
+                3.1.meminfo   #显示内存信息
+        4 Memory access commands
+                4.1.mdw    #Memory Display Word
+                4.2.mdh    #Memory Display HalfWord
+                4.3.mdb    #Memory Display Byte
+                4.4.mww    #Memory Write Word
+                4.5.mwh    #Memory Write Halfword
+                4.6.mwb    #Memory Wirte Byte
+        5 Image loading commands
+                5.1.dump_image  #从内存中copy镜像
+                5.2.fast_load#加载镜像到内存
+                5.3.fast_load_image#加载镜像到内存
+                5.4.load_image#加载镜像到内存
+        6 Breakpoint and Watchpoint commands
+                6.1.bp [address len [hw]]#显示BreakPoint信息
+                6.2.rbp address# Remove BreakPoint
+                6.3.rwp address#Remove Date Wathpoint  on address
+                6.4.wp  #显示WatchPoint信息
+        7 Misc commands
+                7.1.scan_chain   #扫描并显示TAP信息
+
+        OpenOCD的内容就说这么多，关键还是多实践，多阅读文档，OpenOCD的优势就是开源，支持N种调试器。充分的理解和掌握整个开发过程中的调试方法，是项目稳定进行的可靠保障，很多未知问题都得通过底层调试才能分析出来。
+		SDK下载地址：   https://github.com/aggresss/RFDemo

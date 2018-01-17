@@ -1,0 +1,158 @@
+上一期在写入flash时用到了tftp服务tftpboot 0x80100000 uboot.bin，也就是通过网络传输协议,这一期我们来分析一下U-Boot是怎么控制hg255d进行网络传输的。
+首先，在common/cmd_net.c 文件中找到tftpboot的定义，
+[cpp] view plain copy 
+U_BOOT_CMD(  
+    tftpboot,   3,  1,  do_tftpb,  
+    "tftpboot- boot image via network using TFTP protocol\n",  
+    "[loadAddress] [bootfilename]\n"  
+);  
+这个命令是通过调用do_tftpb函数来完成的
+[cpp] view plain copy 
+int do_tftpb (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])  
+{  
+#ifdef DEBUG  
+   printf("File: %s, Func: %s, Line: %d\n", __FILE__,__FUNCTION__ , __LINE__);  
+#endif     
+    return netboot_common (TFTP, cmdtp, argc, argv);  
+}  
+do_tftpb又是通过调用netboot_common来实现的，看一下它的原型：
+static int netboot_common (int proto, cmd_tbl_t *cmdtp, int argc, char *argv[]);
+这个函数的第一个参数是网络启动的协议类型，第190行 if ((size = NetLoop(proto)) < 0) 中发现，NetLoop函数来调用相应的协议，跟进NetLoop函数，在函数的注释部分说明为：Main network processing loop. 可见他就是U-Boot实现网络功能的主要函数。这个函数比较长，大约有400行，这里就不贴出来了，这个函数的大体原理就是首先进行一些变量的初始化，读取系统变量中的IP配置信息，然后根据传入参数选择具体的协议，最后在517行进入一个for循环，在循环中可以发现eth_rx()这个函数用来接收数据，果断跟进发现在/net/eth.c中定义，开始分析这个文件：
+[cpp] view plain copy 
+int eth_send(volatile void *packet, int length)  
+{  
+    if (!eth_current)  
+        return -1;  
+  
+    return eth_current->send(eth_current, packet, length);  
+}  
+  
+int eth_rx(void)  
+{  
+    if (!eth_current)  
+        return -1;  
+  
+    return eth_current->recv(eth_current);  
+}  
+数据的收发都是通过这两个函数来进行的，可以发现网卡设备也就是eth_device在U-Boot中被抽象成一个结构体：
+[cpp] view plain copy 
+struct eth_device {  
+    char name[NAMESIZE];  
+    unsigned char enetaddr[6];  
+    int iobase;  
+    int state;  
+  
+    int  (*init) (struct eth_device*, bd_t*);  
+    int  (*send) (struct eth_device*, volatile void* pachet, int length);  
+    int  (*recv) (struct eth_device*);  
+    void (*halt) (struct eth_device*);  
+  
+    struct eth_device *next;  
+    void *priv;  
+};  
+这个结构体包含名称，mac地址，寄存器基址，状态信息，和初始化，发送，接收，暂停的函数指针，具体这个结构体是怎么被实例化的我们还要分析U-Boot的初始化过程，在board.c文件第1627行的board_init_r()函数中eth_initialize()函数来实现这个网络设备初始化的操作，这个函数主要作用是根据CONFIG_的配置信息来选择具体的初始化函数，因为RT3052内部集成了ehernet控制器，所以调用rt2880_eth_initialize(bis);函数来初始化网络控制器：
+[cpp] view plain copy 
+int rt2880_eth_initialize(bd_t *bis)  
+{  
+    struct  eth_device*     dev;  
+    int i;  
+    u32 regValue;  
+  
+    if (!(dev = (struct eth_device *) malloc (sizeof *dev))) {  
+        printf("Failed to allocate memory\n");  
+        return 0;  
+    }  
+  
+    memset(dev, 0, sizeof(*dev));  
+  
+    sprintf(dev->name, "Eth0 (10/100-M)");  
+  
+    dev->iobase = RALINK_FRAME_ENGINE_BASE;  
+    dev->init   = rt2880_eth_init;  
+    dev->halt   = rt2880_eth_halt;  
+    dev->send   = rt2880_eth_send;  
+    dev->recv   = rt2880_eth_recv;  
+  
+    eth_register(dev);  
+    eth_loopback_mode = 0;  
+    rt2880_pdev = dev;  
+    loopback_protect = 0;  
+  
+    force_queue_n = 3;  
+    sdp0_alig_16n_x = 0;  
+    sdp1_alig_16n_x = 0;  
+    rt2880_eth_initd =0;  
+    rt2880_size_of_mem = 0;  
+    rt2880_esram_gear = ESRAM_OFF;  
+    internal_loopback_test = INTERNAL_LOOPBACK_DISABLE;  
+    header_payload_scatter_en = DISABLE;  
+    rt2880_buf_in_esram_en = DISABLE;  
+    rt2880_desc_in_esram = DISABLE;  
+    rt2880_sdp0_buf_in_esram_en = DISABLE;  
+    PktBuf = Pkt_Buf_Pool;  
+    PKT_HEADER_Buf = PKT_HEADER_Buf_Pool;  
+    is_internal_loopback_test = 0;  
+    rt2880_hdrlen = 20;  
+    NetTxPacket = NULL;  
+    rt2880_debug_en = DISABLE;  
+    rx_ring = (struct PDMA_rxdesc *)KSEG1ADDR((ulong)&rx_ring_cache[0]);  
+    tx_ring0 = (struct PDMA_txdesc *)KSEG1ADDR((ulong)&tx_ring0_cache[0]);  
+  
+    rt2880_free_buf_list.head = NULL;  
+    rt2880_free_buf_list.tail = NULL;  
+  
+    rt2880_busing_buf_list.head = NULL;  
+    rt2880_busing_buf_list.tail = NULL;  
+  
+    //2880_free_buf  
+  
+    /* 
+     *  Setup packet buffers, aligned correctly. 
+     */  
+    rt2880_free_buf[0].pbuf = (unsigned char *)(&PktBuf[0] + (PKTALIGN - 1));  
+    rt2880_free_buf[0].pbuf -= (ulong)rt2880_free_buf[0].pbuf % PKTALIGN;  
+    rt2880_free_buf[0].next = NULL;  
+  
+    rt2880_free_buf_entry_enqueue(&rt2880_free_buf_list,&rt2880_free_buf[0]);  
+  
+#ifdef DEBUG  
+    printf("\n rt2880_free_buf[0].pbuf = 0x%08X \n",rt2880_free_buf[0].pbuf);  
+#endif  
+    for (i = 1; i < PKTBUFSRX; i++) {  
+        rt2880_free_buf[i].pbuf = rt2880_free_buf[0].pbuf + (i)*PKTSIZE_ALIGN;  
+        rt2880_free_buf[i].next = NULL;  
+#ifdef DEBUG  
+        printf("\n rt2880_free_buf[%d].pbuf = 0x%08X\n",i,rt2880_free_buf[i].pbuf);  
+#endif  
+        rt2880_free_buf_entry_enqueue(&rt2880_free_buf_list,&rt2880_free_buf[i]);  
+    }  
+  
+    for (i = 0; i < PKTBUFSRX; i++)  
+    {  
+        rt2880_free_buf[i].tx_idx = NUM_TX_DESC;  
+#ifdef DEBUG  
+        printf("\n rt2880_free_buf[%d] = 0x%08X,rt2880_free_buf[%d].next=0x%08X \n",i,&rt2880_free_buf[i],i,rt2880_free_buf[i].next);  
+#endif  
+    }  
+          
+      
+    //set clock resolution  
+    extern unsigned long mips_bus_feq;  
+    regValue = le32_to_cpu(*(volatile u_long *)(RALINK_FRAME_ENGINE_BASE + 0x0008));  
+    regValue |=  ((mips_bus_feq/1000000) << 8);  
+    *((volatile u_long *)(RALINK_FRAME_ENGINE_BASE + 0x0008)) = cpu_to_le32(regValue);  
+      
+    return 1;  
+}  
+到这里，如果您一直在跟进，大概就能了解顶层函数是怎样一步一步的最底层的硬件进行控制的，分析U-Boot这样的软件对于将来做架构方面的转型很有帮助，因为U-Boot中的universual就是靠出色的架构来兼容各种硬件设备。
+像ethernet这种设备都是分层工作的我们只要控制寄存器就行，具体的phy层次的操作都是有芯片厂商通过硬件有限状态机的模式实现。
+#define RALINK_FRAME_ENGINE_BASE 0xB0100000
+我们来查看ralink_RT3052的Datasheet的3.17节:
+
+
+
+
+关于Frame Engine 这一节的内容还是比较多的，而且比较复杂，如果讲详细，我相信可以出一本书了，我这里讲解一下分析思路，希望大家再进行更深层次的拓展学习。
+
+----------------------------------------------------
+SDK下载地址：   https://github.com/aggresss/RFDemo

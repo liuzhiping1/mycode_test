@@ -1,0 +1,51 @@
+这一期来进行OpenWrt的编译，我们的最终目的是生成可以被U-Boot引导的OpenWrt固件，整个编译过程比较耗时，根据网络情况而定，我用了3个小时，编译磁盘要预留10G的存储空间。
+        编译步骤如下：
+git git://git.openwrt.org/15.05/openwrt.git
+./scripts/feeds update -a
+./scripts/feeds install -a
+make defconfig
+make prereq
+make menuconfig
+
+
+主要是这几项选择正确：
+Target System (Ralink RT288x/RT3xxx)  --->
+Subtarget (RT3x5x/RT5350 based boards)  --->
+Target Profile (HuaWei HG255D)  --->
+再把这三个选项选中，这个是在bin目录下生成ImageBuilder，Toolchain和SDK工具包：
+[*] Build the OpenWrt Image Builder                                                            
+[*] Build the OpenWrt SDK                                                                            
+[*] Build the OpenWrt based Toolchain   
+进行编译之前还要修改一个Makefile文件
+vim target/linux/ramips/image/Makefile
+在文件内搜索"hg255d"，我这里是538行和733行，将这两行的行首注释"#"去掉，保存退出，否则无法生成适用于hg255d的编译文件。之所以这样估计是OpenWrt官方支持hg255d硬件后，发现了不稳定因素暂时屏蔽了hg255d固件文件的输出。
+然后执行：
+make -j1 V=99
+        接下来就是漫长的等待，如果系统链接库完整并且网络畅通，可能一次就能编译成功，如果出现error而终止，就要多查看错误信息，判断系统缺少什么文件，然后安装，我这里介绍一个诊断的方法，比如我在编译时提示找不到evp.h文件而终止编译，对于Ubuntu系统可以使用apt-file工具，如果你没有安装就可以使用 sudo apt-get install apt-file 来安装，安装成功后使用apt-file update 来更新源信息，上面步骤都成功后使用 apt-file search evp.h 输出以下信息：
+aggresss@AGGAWE:~$ apt-file search evp.h
+gnu-efi: /usr/include/efi/efidevp.h
+gsoap: /usr/share/gsoap/plugin/md5evp.h
+gsoap: /usr/share/gsoap/plugin/mecevp.h
+gsoap: /usr/share/gsoap/plugin/smdevp.h
+gsoap-doc: /usr/share/doc/gsoap-doc/wsse/html/mecevp.html
+gsoap-doc: /usr/share/doc/gsoap-doc/wsse/html/smdevp.html
+heimdal-multidev: /usr/include/heimdal/hcrypto/evp.h
+libssl-dev: /usr/include/openssl/evp.h
+libwolfssl-dev: /usr/include/cyassl/openssl/evp.h
+libwolfssl-dev: /usr/include/wolfssl/openssl/evp.h
+libxmlsec1-dev: /usr/include/xmlsec1/xmlsec/openssl/evp.h
+libxmlsec1-dev: /usr/share/doc/libxmlsec1-dev/html/api/xmlsec-openssl-evp.html
+aggresss@AGGAWE:~$ 
+        观察后发现libssl中包含我们需要的文件，这是问题就变得简单了使用 sudo apt-get install libssl 安装成功后重新编译就能解决问题。
+        如果编译成功，就会在bin\ramips目录下出现 openwrt-ramips-rt305x-hg255d-squashfs-sysupgrade.bin 文件。用这个文件就可以启动OpenWrt系统。
+        在bin\ramips目录下还有这三个文件，他们分别是ImagenBuilder，SDK和Toolchain的压缩包，我们在以后的定制开发中会用到：
+OpenWrt-ImageBuilder-ramips-rt305x.Linux-i686.tar.bz2
+OpenWrt-SDK-ramips-rt305x_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-i686.tar.bz2
+OpenWrt-Toolchain-ramips-rt305x_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-i686.tar.bz2
+        有三种方法编译openwrt定制固件。
+1. 用ImageBuilder编译，用于灵活选择package。毕竟压缩的只读文件系统squashfs比可写的JFFS能省不少地方，可以用来把玩更多的package。
+2. 用SDK编译，用于编译package仓库中没有的软件包，另外其中有配套的内核源码及头文件，编译缺失的内核模块也很方便。
+3. 从源码编译，因为要重新编译cross-compile toolchians，下载最内核和软件包的源码编译，导致这个过程比较耗时，用于上述两种情况搞不定的情况。
+----------------------------------
+
+SDK下载地址：   https://github.com/aggresss/RFDemo

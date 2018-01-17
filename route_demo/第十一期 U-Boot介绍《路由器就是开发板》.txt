@@ -1,0 +1,94 @@
+从这一期开始我会利用10期的量来在我们之前改造过的开发板上进行U-Boot相关的实验，目标是将ralink_SDK3.6版本的U-Boot增加 web failsafe 功能，就是论坛里大家说的”不死U-Boot“的特殊功能，可以通过web的形式加载固件。当然，以U-Boot的代码量，想要系统化详细分析是一个巨大的工程，所以我的方式是讲解一些基础知识，然后再讲解为实现某一功能的改造的过程，通过这个过程，让大家掌握对U-Boot分析、学习和改造的方法。
+        关于U-Boot的介绍可以参看U-Boot的官方wiki http://www.denx.de/wiki/U-Boot/WebHome 
+        U-Boot是德国DENX小组的开发用于多种嵌入式CPU的bootloader程序, U-Boot不仅仅支持嵌入式Linux系统的引导，当前，它还支持NetBSD, VxWorks, QNX, RTEMS, ARTOS, LynxOS嵌入式操作系统。UBoot除了支持PowerPC系列的处理器外，还能支持MIPS、 x86、ARM、NIOS、XScale等诸多常用系列的处理器。
+        U-Boot的介绍我在这里就不做赘述了，任何一本和嵌入式开发相关的书籍都会提到U-Boot，可以有很多种方式去了解U-Boot的理论知识，我在这里还是以讲解动手操作为主。
+        ftp://ftp.denx.de/pub/u-boot/  可以下载到所有的U-Boot版本。
+        U-Boot版本命名规则：
+        （1）2008年8月及以前按版本号命名：例如u-boot-1.3.4；
+        （2）2008年8月以后均按日期命名：例如u-boot-2011.06（2011年6月更新）
+        我们采用的ralink_SDK3.6使用的是U-Boot早期的1.1.3版本，并在其上做了一些删减和修改，具体做了哪些改动我们可以借助比对工具进行分析，这里推荐两个工具beyond compare 和 meld 分别是windows和linux的比对工具，都是基于图形界面，可以清晰的看到代码的增删状态。
+
+
+
+        Ralink_SDK中的U-Boot我们可以拿来直接使用，一些针对HG255d的移植我们在后几期再讨论，这里先初步体验一下。在SDK的Code目录下的Uboot文件夹就是Ralink_SDK3.6的U-Boot，在linux环境下，安装必要的编译工具后进入该目录然后 make menuconfig 命令，进入如下的界面：
+
+        将每个选项选择到如下状态，关于DRAM Component 选择128Mb 这个作出解释，HG255d的RAM是32MByte容量，由两颗16bit位宽的RAM芯片并列组成，所以是32位宽，这里注意下一大写的B表示byte，小写的b表示bit，1byte=8bit，DRAM Component 值表示单颗RAM芯片的bit数量，DRAM Component选择128Mbit，128Mbit = 16MByte，两颗16MByte得容量就是32MB。
+        将配置保存，然后 make 就能生成Uboot的可执行文件 uboot.bin 将 文件导入hg255d的内存然后运行，具体的操作方法请参考第十期。U-boot的默认console通过TTL输出，可以使用串口调试工具查看U-Boot的输出信息，我这里使用的是SecureCRT，Ralink的U-Boot的console波特率默认为57600bps 具体的连接参数为：
+
+接收到的信息为：
+[cpp] view plain copy
+U-Boot 1.1.3 (Sep 15 2016 - 18:21:14)  
+  
+Board: Ralink APSoC DRAM:  16 MB  
+relocate_code Pointer at: 80fb0000  
+config usb..  
+  
+ Set info->start[0]=BF000000  
+flash_protect ON: from 0xBF030000 to 0xBF030FFF  
+*** Warning - bad CRC, using default environment  
+  
+============================================   
+Ralink UBoot Version: 3.6.0.0  
+--------------------------------------------   
+ASIC 3052_MP2 (Port5<->None)  
+DRAM component: 128 Mbits SDR  
+DRAM bus: 32 bit  
+Total memory: 32 MBytes  
+Flash component: NOR Flash  
+Date:Sep 15 2016  Time:18:21:14  
+============================================   
+icache: sets:256, ways:4, linesz:32 ,total:32768  
+dcache: sets:128, ways:4, linesz:32 ,total:16384   
+  
+ ##### The CPU freq = 384 MHZ ####   
+ estimate memory size =16 Mbytes  
+  
+Please choose the operation:   
+   1: Load system code to SDRAM via TFTP.   
+   2: Load system code then write to Flash via TFTP.   
+   3: Boot system code via Flash (default).  
+   4: Entr boot command line interface.  
+   7: Load Boot Loader code then write to Flash via Serial.   
+   9: Load Boot Loader code then write to Flash via TFTP.   
+  
+You choosed 3  
+  
+ 0   
+     
+3: System Boot system code via Flash.  
+## Booting image at bf050000 ...  
+Bad Magic Number,FFFFFFFF   
+
+默认是启动系统，如果在启动时输入4，可以进入命令模式：
+[cpp] view plain copy 
+You choosed 4  
+  
+ 0   
+     
+4: System Enter Boot Command Line Interface.  
+  
+U-Boot 1.1.3 (Sep 15 2016 - 18:21:14)  
+RT3052 # ?   
+?       - alias for 'help'  
+bootm   - boot application image from memory  
+cp      - memory copy  
+erase   - erase FLASH memory  
+go      - start application at address 'addr'  
+help    - print online help  
+loadb   - load binary file over serial line (kermit mode)  
+md      - memory display  
+mdio   - Ralink PHY register R/W command !!  
+mm      - memory modify (auto-incrementing)  
+mw      - memory write (fill)  
+nm      - memory modify (constant address)  
+printenv- print environment variables  
+protect - enable or disable FLASH write protection  
+reset   - Perform RESET of the CPU  
+rf      - read/write rf register  
+saveenv - save environment variables to persistent storage  
+setenv  - set environment variables  
+spicmd  - read/write data from/to eeprom or vtss  
+tftpboot- boot image via network using TFTP protocol  
+version - print monitor version  
+RT3052 #  
+        可以输入命令了解一下与U-Boot的交互方式，如果你是第一次接触U-Boot那可以利用搭建好的环境结合一些理论知识对U-Boot进行一次系统的学习，我的原则就是边动手边学习，所有的理论学习都要通过一次动手实践来巩固。文章前面讲到的是怎样实现一个最简单的U-Boot实践环境，接下来我们会继续深入，分析U-Boot的编译和运行原理。

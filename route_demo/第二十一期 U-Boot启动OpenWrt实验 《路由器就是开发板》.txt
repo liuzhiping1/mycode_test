@@ -1,0 +1,173 @@
+这一期我们来做一个引导OpenWrt的实验，虽然还没有讲到OpenWrt的内容，但这里我们先拿一个我编译好的固件来实验一下，具体固件怎么编译下一期再讲。
+如果使用RalinkSDK3.6的U-Boot进行编译出来的U-Boot启动时TTL会输出如下信息：
+3: System Boot system code via Flash.
+## Booting image at bf050000 ...
+这个地址是Ralin默认的firmware地址。这里我们来分析一下flash的分区结构：
+
+
+上面这张图一目了然，但是OpenWrt给hg255的的flash分区却和Ralink的分区不一样，我们看一下OpenWrt对hg255d的dts文件：
+[cpp] view plain copy 
+target/linux/ramips/dts/HG255D.dts  
+######################################  
+/dts-v1/;  
+  
+/include/ "rt3050.dtsi"  
+  
+/ {  
+    compatible = "HG255D", "ralink,rt3052-soc";  
+    model = "HuaWei HG255D";  
+  
+    pinctrl {  
+        state_default: pinctrl0 {  
+            gpio {  
+                ralink,group = "spi", "i2c", "jtag", "rgmii", "mdio", "uartf";  
+                ralink,function = "gpio";  
+            };  
+        };  
+    };  
+  
+    cfi@1f000000 {  
+        compatible = "cfi-flash";  
+        reg = <0x1f000000 0x1000000>;  
+  
+        bank-width = <2>;  
+        device-width = <2>;  
+        #address-cells = <1>;  
+        #size-cells = <1>;  
+  
+        partition@0 {  
+            label = "u-boot";  
+            reg = <0x0 0x40000>;  
+            read-only;  
+        };  
+  
+        partition@30000 {  
+            label = "u-boot-env";  
+            reg = <0x40000 0x20000>;  
+            read-only;  
+        };  
+  
+        factory: partition@60000 {  
+            label = "factory";  
+            reg = <0x60000 0x20000>;  
+            read-only;  
+        };  
+  
+        partition@80000 {  
+            label = "firmware";  
+            reg = <0x80000 0xf60000>;  
+        };  
+  
+        partition@fa0000 {  
+            label = "factory-orig";  
+            reg = <0xfa0000 0x20000>;  
+            read-only;  
+        };  
+    };  
+  
+    gpio-leds {  
+        compatible = "gpio-leds";  
+        power {  
+            label = "hg255d:power";  
+            gpios = <&gpio0 8 1>;  
+        };  
+        internet {  
+            label = "hg255d:internet";  
+            gpios = <&gpio0 13 1>;  
+        };  
+        wifi {  
+            label = "hg255d:wlan";  
+            gpios = <&gpio0 14 1>;  
+        };  
+        usb {  
+            label = "hg255d:usb";  
+            gpios = <&gpio0 9 1>;  
+        };  
+        wps {  
+            label = "hg255d:wps";  
+            gpios = <&gpio0 12 1>;  
+        };  
+        voice {  
+            label = "hg255d:voice";  
+            gpios = <&gpio0 5 1>;  
+        };  
+    };  
+  
+    gpio-keys-polled {  
+        compatible = "gpio-keys-polled";  
+        #address-cells = <1>;  
+        #size-cells = <0>;  
+        poll-interval = <10>;  
+        reset {  
+            label = "reset";  
+            gpios = <&gpio0 4 1>;  
+            linux,code = <0x198>;  
+        };  
+        wps {  
+            label = "wps";  
+            gpios = <&gpio0 10 1>;  
+            linux,code = <0x211>;  
+        };  
+        rfkill {  
+            label = "rfkill";  
+            gpios = <&gpio0 0 1>;  
+            linux,code = <0xf7>;  
+        };  
+    };  
+  
+    ethernet@10100000 {  
+        mtd-mac-address = <&factory 0x28>;  
+    };  
+  
+    esw@10110000 {  
+        ralink,portmap = <0x2f>;  
+    };  
+  
+    wmac@10180000 {  
+        ralink,mtd-eeprom = <&factory 0>;  
+    };  
+  
+    otg@101c0000 {  
+        status = "okay";  
+    };  
+};  
+
+
+我把这个文件描述的flash分区画了张图：
+
+
+
+
+可以看出OpenWrt内核的引导地址为0xBF080000，而Ralink的默认引导地址为0xBF050000，如果不修改是无法引导OpenWrt的。这里的解决方案是修改U-Boot目录下 include/config/rt2880.h 的定义文件 的293行
+
+[cpp] view plain copy 
+################################  
+#define CFG_BOOTLOADER_SIZE 0x30000  
+#define CFG_CONFIG_SIZE     0x10000  
+#define CFG_FACTORY_SIZE    0x10000  
+#define CFG_ENV_ADDR        (CFG_FLASH_BASE + CFG_BOOTLOADER_SIZE)  
+#define CFG_FACTORY_ADDR    (CFG_FLASH_BASE + CFG_BOOTLOADER_SIZE + CFG_CONFIG_SIZE)  
+#define CFG_KERN_ADDR       (CFG_FLASH_BASE + (CFG_BOOTLOADER_SIZE + CFG_CONFIG_SIZE + CFG_FACTORY_SIZE))  
+###########################################  
+修改为：  
+#define CFG_BOOTLOADER_SIZE 0x40000  
+#define CFG_CONFIG_SIZE     0x20000  
+#define CFG_FACTORY_SIZE    0x20000  
+###########################################  
+
+
+这样就和OpenWrt的flash分区同步了，用前面提到的方法将OpenWrt刷入flash 0xBF080000开始的地址，然后用U-Boot默认方式启动就能看到OpenWrt已经启动了：
+
+
+
+
+
+启动后telnet可以访问OpenWrt
+
+
+
+
+
+----------------------------------
+
+SDK下载地址：   https://github.com/aggresss/RFDemo

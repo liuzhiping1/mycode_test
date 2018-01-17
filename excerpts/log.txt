@@ -528,7 +528,7 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
     虚拟机 网络模式 NAT
     原来我之前没有接路由器时用桥接模式虚拟机不能上网的原因：如果你有路由器的话，那么就可以使用桥接方式上网，因为此时你申请的IP地址是写在了路由器上，而不是你的机器上，这样包括你的主机，虚拟机，也包括连在路由器上的其他人的机器，都将可以上网，使用着由路由器自动分配的IP地址
     https://www.cnblogs.com/wenanry/archive/2009/12/21/1629242.html  linux网络配置
-----------------------------------------------------------------------------------------------------------------------------------------------------------
+-----------------------------------【key：虚拟机配置网络】-----------------------------------------------------------------------------------------------------------------------
 20180105：用virtualbox的host-only网络连接模式，本地主机连接到了虚拟机。
     http://blog.csdn.net/a627088424/article/details/47421531  linux下网络调试工具
     DNS、网关、dhcp、子网掩码、NAT、路由、桥接、host-only、ssh、端口、网络接口
@@ -585,7 +585,7 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
 	第三章：系统编程概念
 		GUN C 语言函数库glibc，用ldd myprog | grep libc可以查看程序链接库的版本
     
-----------------------------------------------------------------------------------------------------------------------------------------------------------
+------------------------------【key: 宝华】----------------------------------------------------------------------------------------------------------------------------
 20180110：学习宋宝华的联系代码。https://github.com/liuzhiping1/training 【宝华的笔记，可以节约我好多时间，如获至宝】
 	shell：
 		getopts h:ms option 判断命令行选项‘-’后是否为h或ms，没有参数就option为？，有的话实际参数给特殊变量OPTARG，特殊变量OPTIND是下一个参数的索引，初始为1
@@ -642,12 +642,12 @@ https://www.cnblogs.com/xiaojiang1025/p/6500540.html linux i2c 子系统分析
 			
 			3.重新启动TFTP服务
 			sudo service tftpd-hpa restart
-----------------------------------------------------------------------------------------------------------------------------------------------------------
+---------------------------------【key: LCD驱动】------------------------------------------------------------------------------------------------------------------------
 20180111：写LCD段码驱动TM1723
 	芯片与mcu用spi串口通信，集成段码输出IO、PWM0~3输出、按键4X3读入。
 	芯片级驱动 与 显示按键级驱动分层。
 	将段码逻辑转化成资源文件resource.txt,然后在写成头文件，具体逻辑C实现用相关宏即可。
-----------------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------【key: linux 应用】----------------------------------------------------------------------------------------------------------------------
 20180112：
 readelf -S  Displays the information contained in the file's section headers
 strace ./a.out 1>&log
@@ -665,7 +665,7 @@ if(signal(SIGINT,sigHandler) == SIG_ERR) --信号处理器
 key_t ftok( const char * fname, int id ) --系统建立IPC通讯 （消息队列、信号量和共享内存） 时必须指定一个ID值。通常情况下，该id值通过ftok函数得到。
  pid_t wait (int * status); --wait()会暂时停止目前进程的执行，直到有信号来到或子进程结束
  atoi --atoi, atol, atoll - convert a string to an integer
- ----------------------------------------------------------------------------------------------------------------------------------------------------------
+ ------------------------------【key: 虚拟机】----------------------------------------------------------------------------------------------------------------------------
  20180115:编译qemu虚拟机，http://blog.csdn.net/linyt/article/details/42504975   https://jingyan.baidu.com/article/f00622281253e8fbd3f0c814.html
  安装前需要的工具：
  sudo apt-get install autoconf automake libtool 【这个没装会报错】
@@ -680,7 +680,8 @@ sudo apt-get insatll ncurses-dev
 set：shell的变量，env：用户环境变量，export：将shell变量export到用户变量
 【**】ubuntu shell 下默认的脚本解析器是dash, 会使一些bash脚本执行失败，通过如下方式改回bash:sudo dpkg-reconfigure dash 
 http://blog.csdn.net/h002399/article/details/44940777  linux下的路由表详解【重要】
-----------------------------------------------------------------------------------------------------------------------------------------------------------
+【make】make的调试命令选项：-n 、-p、函数$(warning xxx)
+--------------------------【key: 路由】--------------------------------------------------------------------------------------------------------------------------------
 20180116： 接着昨天路由的学习
 @规则（rule）
 
@@ -758,3 +759,29 @@ iptables –t nat –A POSTROUTING –s 192.168.1.0/24 –j MASQUERADE
 步骤五：刷新路由cache，使新的路由表生效
 ip route flush cache
 这样就可以实现了以上要求的策略路由了，并且可以通过traceroute工具来检测上面的设置是否能正常工作。
+【在掌阅app上买了宋宝华的linux驱动开发详解】
+
+【在opensuse上装qemu-2.11.0.tar.xz，之前2.0版本不兼容glib2.0】
+虚拟机qemu：
+ qemu-system-arm -M vexpress-a9 -kernel arch/arm/boot/zImage -nographic -append "console=ttyAMA0"
+	busybox：make defconfig ARCH=arm ;make menuconfig ;make ARCH=arm CROSS_COMPILE=arm-hisiv300-linux- install 
+	创建根文件系统：
+		1.  创建rootfs目录（根目录），根文件系统内的文件全部放到这里：mkdir -p rootfs/{dev,etc/init.d,lib}
+		2. 拷贝busybox命令到根目录下 ：cp busybox-1.20.2/_install/* -r rootfs/
+		3. 从工具链中拷贝运行库到lib目录下：cp -P /opt/hisi-linux/x86-arm/arm-hisiv300-linux/arm-hisiv300-linux-uclibcgnueabi/lib/* rootfs/lib/
+		4. 创建4个tty端终设备
+		sudo mknod rootfs/dev/tty1 c 4 1
+		sudo mknod rootfs/dev/tty2 c 4 2
+		sudo mknod rootfs/dev/tty3 c 4 3
+		sudo mknod rootfs/dev/tty4 c 4 4
+	制作文件系统镜像：
+		1. 生成32M大小的镜像：dd if=/dev/zero of=a9rootfs.ext3 bs=1M count=32
+		2. 格式化成ext3文件系统 ：mkfs.ext3 a9rootfs.ext3
+		3.  将文件拷贝到镜像中
+			sudo mkdir tmpfs
+			sudo mount -t ext3 a9rootfs.ext3 tmpfs/ -o loop
+			sudo cp -r rootfs/*  tmpfs/
+			sudo umount tmpfs
+	启动：qemu-system-arm -M vexpress-a9 -m 512M -kernel zImage -nographic -append "root=/dev/mmcblk0 console=ttyAMA0" -sd /opt/Hi3516A_SDK_V1.0.6.0/osdrv/opensource/busybox/a9rootfs.ext3  【成功启动！！！】
+--------------------------【key: 路由器就是开发板】--------------------------------------------------------------------------------------------------------------------------------
+http://blog.csdn.net/aggresss/article/details/52753098 路由器就是开发板：应用openWrt系统的路由器【这个一定要试一试】

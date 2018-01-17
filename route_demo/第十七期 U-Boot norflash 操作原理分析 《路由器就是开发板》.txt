@@ -1,0 +1,128 @@
+ 在一些论坛里大家说路由器变砖了往往指的就是flash中关键的内容被清空了。就像PC中的硬盘被格式化了一样，有点常识都知道，硬盘被清空了只要没有重要数据，从技术角度讲并不大碍，重新安装一个操作系统就可以了，PC的硬盘相对于路由器的flash简单的地方就在于PC机的底层还有一个标准的BIOS系统，可以支持从其他介质比如光盘，U盘，网络启动PE环境进行一些操作，而且硬盘容易拆卸，很方便导入数据，但路由器的flash就不这么容易了，如果flash内容不小心刷错了真的让人有点摸不着头脑。
+
+        我这里列举一些大家常用的路由器救砖方法：
+
+        （1）.把flash芯片拆解下来，通过编程器重新烧写数据，然后再焊接回去；这种操作对动手操作能力要求较高，同时还要有相应的编程器；
+
+        （2）.通过JTAG调试工具在线烧写数据，这种方式要求路由器预留JTAG接口，同时需要调试工具对flash芯片和SOC芯片的支持，局限性较大；
+
+        （3）.如果路由器的U-Boot部分没有被清除，可以通过TTL的方式与U-Boot的方式交互，然后在使用tftp或者xmodem协议将数据写入flash，这是最简单的方法了，但前提是U-Boot仍能正常工作；
+
+        以上三种方式各有利弊，具体怎么操作救砖就得具体问题具体分析了。
+
+        再普及一下flash相关的信息，flash按照材质分为norflash和nandflash，其中，nor和nand代表not or 和 not and 也就是说实现原理一个是或非门实现一个是与非门实现，nandflash容量大但读写操作时序多，norflash读写速度快但价格略贵。路由器中常见的flash有3种，NAND flash，SPI flash和 CFI Flash，其中 SPI flash和 CFI Flash的介质都是Norflash ，SPI 是通过串行接口来实现数据操作，而 CFI
+ Flash 则以并行接口进行数据操作，SPI相对于CFI的优势就是接口数量少，可以做得很小，减少PCB板空间的占用；CFI接口的优势是操作flash可以想操作RAM一样简单，但是由于flash的工艺决定了flash在进行写操作时要先进行擦除操作。
+
+        这一期我们来研究一下U-Boot对flash操作的基本原理，由于hg255d使用的是CFI接口的norflash芯片S29GL128P，所以这一期我们以此为例进行分析。
+
+        通过TTL查看U-Boot的输出信息
+
+[cpp] view plain copy 
+Please choose the operation:   
+   1: Load system code to SDRAM via TFTP.   
+   2: Load system code then write to Flash via TFTP.   
+   3: Boot system code via Flash (default).  
+   4: Entr boot command line interface.  
+   7: Load Boot Loader code then write to Flash via Serial.   
+   9: Load Boot Loader code then write to Flash via TFTP.   
+这里面第9项是将U-Boot镜像从tftp服务器下载到RAM并写入flash，我们来分析一下这个命令的实现原理：
+
+这个信息的打印是通过/lib_mips/board.c中的board_init_r()函数实现的，board.c第1820行：
+
+[cpp] view plain copy 
+case '9':  
+            printf("   \n%d: System Load Boot Loader then write to Flash via TFTP. \n", SEL_LOAD_BOOT_WRITE_FLASH);  
+            printf(" Warning!! Erase Boot Loader in Flash then burn new one. Are you sure?(Y/N)\n");  
+            confirm = getc();  
+            if (confirm != 'y' && confirm != 'Y') {  
+                printf(" Operation terminated\n");  
+                break;  
+            }  
+            tftp_config(SEL_LOAD_BOOT_WRITE_FLASH, argv);  
+            argc= 3;  
+            setenv("autostart", "no");  
+            do_tftpb(cmdtp, 0, argc, argv);  
+  
+  
+            if (NetBootFileXferSize > CFG_BOOTLOADER_SIZE) {  
+                printf("Abort: bootloader size too big!\n");  
+            }  
+else {  
+                //protect off uboot  
+                flash_sect_protect(0, CFG_FLASH_BASE, CFG_FLASH_BASE+CFG_BOOTLOADER_SIZE-1);  
+  
+  
+                //erase uboot  
+                printf("\n Erase U-Boot block !!\n");  
+                printf("From 0x%X To 0x%X\n", CFG_FLASH_BASE, CFG_FLASH_BASE+CFG_BOOTLOADER_SIZE-1);  
+                flash_sect_erase(CFG_FLASH_BASE, CFG_FLASH_BASE+CFG_BOOTLOADER_SIZE-1);  
+  
+  
+                //cp.uboot              
+                argc = 4;  
+                argv[0]= "cp.uboot";  
+                do_mem_cp(cmdtp, 0, argc, argv);                         
+  
+  
+                //protect on uboot  
+                flash_sect_protect(1, CFG_FLASH_BASE, CFG_FLASH_BASE+CFG_BOOTLOADER_SIZE-1);  
+            }  
+#endif //CFG_ENV_IS_IN_FLASH  
+        可以看到操作过程大体就是 通过连接tftp服务将U-Boot下载到RAM --> 关闭flash写保护 --> 擦除flash -->写U-Boot到flash --> 打开flash保护。写flash的操作do_mem_cp(cmdtp, 0, argc, argv); 其实就是内存操作。
+
+        在U-boot的提示符下输入"?"就会列出所有的命令：
+
+[cpp] view plain copy 
+RT3052 # ?  
+?       - alias for 'help'  
+bootm   - boot application image from memory  
+cp      - memory copy  
+erase   - erase FLASH memory  
+go      - start application at address 'addr'  
+help    - print online help  
+loadb   - load binary file over serial line (kermit mode)  
+md      - memory display  
+mdio   - Ralink PHY register R/W command !!  
+mm      - memory modify (auto-incrementing)  
+mw      - memory write (fill)  
+nm      - memory modify (constant address)  
+printenv- print environment variables  
+protect - enable or disable FLASH write protection  
+reset   - Perform RESET of the CPU  
+rf      - read/write rf register  
+saveenv - save environment variables to persistent storage  
+setenv  - set environment variables  
+spicmd  - read/write data from/to eeprom or vtss  
+tftpboot- boot image via network using TFTP protocol  
+version - print monitor version  
+RT3052 #   
+刚才的 Load Boot Loader code then write to Flash via TFTP 操作可以分解成以下的命令实现,HG255D的flash地址从0xbf000000到0xbffffffff共16MB：
+
+
+
+        1. setenv serverip 192.168.1.8  //设置默认连接的tftp服务器的地址
+            setenv ipaddr 192.168.1.2  //设置本地IP地址
+
+            setenv netmask 255.255.255.0  //设置子网掩码
+
+        2. tftpboot 0x80100000 uboot.bin  //连接tftp服务器，下载uboot.bin文件到RAM中的0x80100000地址中
+
+        3. protect off all  //取消flash写保护功能
+
+        4. erase 0xBF000000 0xBF03FFFF  //将flash中0xbf000000~0xbf03ffff的内容擦除
+
+        5. cp.b 0x80100000 0xBF000000 0x40000  //将RAM中 0x80100000开始内容复制到flash中0xbf000000内，大小为0x40000
+
+        6. protect on all  //打开flash写保护功能
+       7. saveenv   //保存变量到flash
+
+        在这里说明一下，使用SDK中提供的OpenOCD的flash_uboot命令将U-Boot写入flash的时候会提示错误：
+
+        error writing to flash at address 0xbf000000 at offset 0x00000000
+
+        flash write_bank bank_id filename offset
+
+这种情况我也没找到解决方法，希望哪位大神看到有解决方法告诉我，俺必当面道谢。不过我在OpenOCD的配置文件里添加了run_uboot_command的proc，我们可以通过这个命令将OpenOCD目录下的uboot_command.bin文件加载进内存并运行，然后通过TTL操作U-Boot对flash进行操作。
+
+----------------------------------------------------
+SDK下载地址：   https://github.com/aggresss/RFDemo

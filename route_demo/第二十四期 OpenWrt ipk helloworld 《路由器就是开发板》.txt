@@ -1,0 +1,76 @@
+OpenWrt作为一个Linux的发行版，同样由各种软件构建了上层的生态系统，它有自己的应用封装方式，和debian系的deb文件，redhat系的rpm文件一样OpenWrt的应用封装文件为ipk，应用的管理软件为opkg。这一期我们来学习一下在OpenWrt系统环境下怎样开发和发布应用程序。
+        在上一期编译好的OpenWrt的bin目录下有一个文件：OpenWrt-SDK-ramips-rt305x_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-i686.tar.bz2，这个文件就是我们在X86上面开发路由器程序的SDK，将它解压出来 tar jvxf OpenWrt-SDK-ramips-rt305x_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-i686.tar.bz2 -C ~/temp
+然后进入~/temp/OpenWrt-SDK-ramips-rt305x_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-i686目录。
+我在SDK的Code\Openwrt_ipk目录下有一个helloworld文件夹，把它copy到刚才进入的目录的package目录下就可以，具体的修改为：
+helloworld目录下新建Makefile文件，内容为：
+[cpp] view plain copy
+include $(TOPDIR)/rules.mk  
+  
+PKG_NAME:=helloworld  
+PKG_RELEASE:=1  
+PKG_BUILD_DIR:=$(BUILD_DIR)/$(PKG_NAME)  
+  
+include $(INCLUDE_DIR)/package.mk  
+  
+define Package/helloworld  
+    SECTION:=utils  
+    CATEGORY:=Utilities  
+    TITLE:=Helloworld -- prints a snarky message  
+endef  
+  
+define Package/helloworld/description  
+    It's my first package demo.  
+endef  
+  
+define Build/Prepare  
+    echo "Here is Package/Prepare"  
+    mkdir -p $(PKG_BUILD_DIR)  
+    $(CP) ./src/* $(PKG_BUILD_DIR)/  
+endef  
+  
+define Package/helloworld/install  
+    echo "Here is Package/install"  
+    $(INSTALL_DIR) $(1)/bin  
+    $(INSTALL_BIN) $(PKG_BUILD_DIR)/helloworld $(1)/bin/  
+endef  
+      
+$(eval $(call BuildPackage,helloworld))  
+
+新建src文件夹：
+新建Makefile文件：
+[cpp] view plain copy
+# build helloworld executable when user executes "make"    
+    
+helloworld: helloworld.o    
+    $(CC) $(LDFLAGS) helloworld.o -o helloworld    
+    
+helloworld.o: helloworld.c    
+    $(CC) $(CFLAGS) -c helloworld.c    
+    
+# remove object files and executable when user executes "make clean"    
+clean:   
+    rm *.o helloworld    
+
+新建helloworld.c文件：
+[cpp] view plain copy
+#include <stdio.h>  
+int main(void)  
+{  
+    printf("Hello World!\n");  
+    return 0;  
+}  
+
+然后回到~/temp/OpenWrt-SDK-ramips-rt305x_gcc-4.8-linaro_uClibc-0.9.33.2.Linux-i686目录，执行 make V=99
+
+
+编译成功后就可以在./bin/ramips/packages/base/目录下看到生成的helloworld_1_ramips_24kec.ipk文件，这个文件就是编译生成的安装包。
+然后我们telnet搭建好的OpenWrt路由器，如果OpenWrt没有经过任何配置，sftp，Samba，nfs，ftp等方式都不太方便，我这里推荐大家使用wget进行下载，首先搭建一个微型的http服务器，将刚才生成的ipk文件放入http服务器根目录就行，我这里使用MyWebServer这个小程序搭建的http服务器。
+
+使用 wget http://xxx.xxx.xxx.xxx/helloworld.ipk 下载ipk文件到OpenWrt；
+然后 opkg install ./helloworld.ipk   安装ipk文件
+安装成功后进入 /bin 目录 里面有一个 helloworld 的可执行文件 ；
+执行 helloworld 就能看到输出信息，说明我们的helloworld小程序就已编译并运行成功，如下图所示：
+
+----------------------------------
+
+SDK下载地址：   https://github.com/aggresss/RFDemo

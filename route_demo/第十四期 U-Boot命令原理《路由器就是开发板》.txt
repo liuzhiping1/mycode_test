@@ -1,0 +1,31 @@
+ 这一期我们说一说人机交互的话题，说白了就是用户界面，当我们拿到一款设备肯定要根据我们自己的环境进行配置，小到路由器大到矩阵存储一般都会提供一种或几种配置方法。我总结了一下接触过的设备，大体上把人机交互的方法分为三种：
+        （1） CLI (Command Line Interface) 典型的命令行就是这种交互方式，一般设备的Console接口都是CLI接口，只要设定好连接参数就可以通过命令的方式进行人机交互，这种交互方式的最大优点就是节省硬件资源，配置参数可自由调整，尤其是使用脚本的方式可以极大的加强工作效率，但缺点就是命令太多不方便记忆，需要透彻的了解设备内部的逻辑结构；
+        （2） WBI (Web Broswer Interface) 这种交互方式是普通用户经常用到的，比如路由器有一个默认管理地址，我们打开浏览器后输入管理地址，填写正确的用户名密码就可以进行相应配置，这种交互方式的优点是通用性强，无论访问者的设备是什么样的软件环境，只要有通用浏览器，支持http或者https协议就可以进行数据交互，缺点是占用设备资源，所见即所得的交互方式，组合性不强，只能进行简单操作；
+        （3） GUI (Graphic Uuser Interface) 这种交互方式是我们，每天都用到的IOS，Android，Windows，linux+X11，都提供了GUI的操作界面，我们只需滑动屏幕或者鼠标就可以轻松的实现人机交互，这种交互方式我就不多评论了，因为它可以和CLI和WBI自由组合，而且针对用户的使用习惯每种GUI界面都有各自的特点。
+        U-Boot在正常的产品里是基本不需要进行与用户交互的，只有当设备的主系统出了问题才会涉及到通过U-Boot进行一些操作，默认情况下它只负责为系统准备加载环境并引导系统内核。
+        在U-Boot内部，功能的实现一般分为两个层次，一种是通过调用函数实现，一种是通过调用命令实现，命令其实就是一组相关函数的封装，用于实现某一特定功能。比如引导操作系统就是通过bootm命令来完成的。
+        我们来分析一下U-Boot后期的启动过程，从board_init_r()函数说起，这个函数的定义在./lib_mips/board.c文件中，第1592行调用OperationSelect()函数打印选择信息并等待一秒钟，如果console端没有用户输入则默认的BootType = '3'，即引导操作系统，第1612行的信息：
+        if(BootType == '3') {
+                char *argv[2];
+                sprintf(addr_str, "0x%X", CFG_KERN_ADDR);
+                argv[1] = &addr_str[0];
+                printf("   \n3: System Boot system code via Flash.\n");
+                do_bootm(cmdtp, 0, 2, argv);
+        }
+        可以看到U-Boot通过调用do_bootm来启动系统内核，我们跳转到do_bootm()函数的定义处，在eclipse环境下光标移动到do_bootm(cmdtp,0,2,argv);的地方然后按F3就会直接跳转到，使用Alt+方向左键就可返回,如果是vim+ctag环境，使用alt+]键可以跳转，Alt+t返回。可以看到do_bootm()函数定义在./common/cmd_bootm.c文件中，你会发现common目录下很多cmd_开头的c文件，他们都是命令相关的文件。
+        来看一下do_bootm的prototype:    int do_bootm (cmd_tbl_t *cmdtp, int flag, int argc, char *argv[])
+可以看出函数有四个参数，int返回类型; *cmdtp 为命令属性的结构题指针，flag 命令标志，argc 调用命令的参数个数，*argv[]调用命令的参数的实际值的数组组合。
+        从上我们得出U-Boot在完成初始化操作后，所有的功能都是通过命令的方式进行调用。返回oard_init_r()函数，我们分析一下，如果我们在开机是选择菜单中的4项， 即4: Entr boot command line interface. 命令是怎么被执行的，board.c第1753行：
+        case '4':
+                printf("   \n%d: System Enter Boot Command Line Interface.\n", SEL_ENTER_CLI);
+                printf ("\n%s\n", version_string);
+                /* main_loop() can return to retry autoboot, if so just run it again. */
+                for (;;) { 
+               main_loop ();
+               }
+可以看到，当选择4的时候就进入了main_loop ()循环，跟进main_loop ()，在./common/main.c文件312行进行定义，分析main_loop可以发现，它的基本原理就是通过readline()函数读取用户的输入，然后调用run_command()函数，run_command()函数将命令和参数进行解析，然后调用相应的函数。
+        我这里简单介绍了一下U-Boot命令的基本原理，大家可以自己动手操作一下，尝试添加一个自定义命令，这样会对U-Boot的命令实现有更透彻的认识。
+
+----------------------------------------------------
+
+SDK下载地址：   https://github.com/aggresss/RFDemo

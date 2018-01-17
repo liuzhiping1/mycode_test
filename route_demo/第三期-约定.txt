@@ -1,0 +1,13 @@
+在开始前一切之前，声明一下以后章节的约定，所有使用到的工具和开发环境都会在这里有一个说明。文章中所有提到的文件或者代码如果不做说明都可以在下面这个链接里找到：https://github.com/aggresss/RFDemo
+        一、关于使用的操作系统。我不是任何一个操作系统的激进分子，我坚持的认为任何操作系统都有它自身的优势和独特的生态系统，所以只要能以最高的效率做完一件事，你可以使用任意操作系统。我的开发环境是在笔记本上使用Ubuntu_16.04LTS_server_32，然后在台式机上安装windows7_Ultimate_64，开发板通过Jlink或Wiggler与台式机相连，笔记本对源码进行编译，通过TCP/IP将目标文件发送到台式机并LOAD到开发板，这种开发结构的优点是笔记本可以方便移动，可以在床上或是马桶上写代码，开发板与台式机连接相对稳定。当然有很多种方式可以选择，你可以只用linux，也可以在windows内虚拟linux，还可以在linux内虚拟windows。
+        二、关于技术门槛。我给《路由器就是开发板》的定位是科普级别，但门槛还是有一点点的，就两点：1.能在路由器的贴片元件上进行飞线焊接，下一期将会看到；2.能够实际动手操作linux系统。实现这两点就够啦，本着探索的精神，都会慢慢提高的。
+        三、关于开发板。某宝上20RMB左右，别买贵啦，我们要的就是超级性价比，挑战的就是500RMB级别的开发板。
+        四、关于调试器。我们需要用到的调试器有两种，一种是基于JTAG接口的jlinkv8和Wiggler，另一种是基于TTL接口的USB转TTL调试器。这些东西在某宝上价格都不贵，jlinkv8在70RMB左右，Wiggler在15RMB左右，两个调试器有其中一个就OK了；USB转TTL价格在20RMB左右，建议选用CH340或者FT2232芯片的TTL调试器。
+        五、关于代码，或者叫SDK。我把多有用到的代码、工具和文档放到了github上，你可以在windows上使用git-for-windows 软件 或者在ubuntu上使用 sudo apt-get install git 安装git 软件，然后使用 git clone git://github.com/aggresss/RFDemo.git 来复制《路由器就是开发板》的SDK开发包。
+        SDK中共4个目录：
+        Code 目录放置了所有实验用的code；
+        DataSheet 目录放置了所有文章中提到的文档； 
+        Picture 目录放置了一些辅助性的图片，便于参考；
+        Tools 目录放置了实验中提到的小工具；
+        需要说明的是U-Boot和编译工具链来自Ralink_ApSoC_SDK_3600_20110715。
+        六、关于patch。很多实验都是基于Uboot或者OpenWRT的由于这两个软件文件体积较大而我们的实验都是简单的修改，所以我们每个实验的示例代码都是基于patch文件的形式提供，比如下面章节提到的hellowold程序，就是基于U-Boot做了简单修改，我们使用的patch文件为led_run.patch，这是我们只需进入U-Boot目录，然后执行 patch -p1 < xxx/led_run.patch (其中xxx为led_run.patch所在目录)就将当前的U-Boot改装成了helloworld实验的代码，如果想退回到之前的状态就执行  patch -R -p1 < xxx/led_run.patch 即可还原回实验前的状态，非常方便。

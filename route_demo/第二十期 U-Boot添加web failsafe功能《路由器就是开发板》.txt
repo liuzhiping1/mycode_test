@@ -1,0 +1,185 @@
+这一期我们在U-Boot上搭建一个简易的web server，实现http方式的更新功能，web server是基于uIP实现，已经有前辈在这方面完成了需求，所以我这里向大家推荐两个github的repository：
+https://github.com/widora/u-boot-mt7688 widora 基于mt7688修改的U-Boot
+ 添加了 web failsafe 功能，我主要参考它的修改。
+https://github.com/pepe2k/u-boot_mod pepe2k 波兰的大哥，基于Athros平台修改的U-Boot，国内很多U-Boot都是基于它的版本进行修改的，上面提到的widora也是。
+再向大家推荐一个博客：http://blog.csdn.net/yangzheng_yz/article/details/40862343
+ 这位小伙将U-Boot移植web failsafe功能讲的很详细。
+使用web failsafe相比TTL+TFTP的方式缺点就是灵活性不够好，我们不能随意的定义刷入固件的地址，所以要在设计的时候将可能会刷入的固件类型都考虑到。ralink平台下flash的分区主要的模块有三个:U-boot，art，firmware。U-Boot就不用说了，开机首先运行；art分区有很多名称，ralink手册中把它称为factory，这个分区的意义是最重要的，里面存放了网卡的MAC地址，无线信号的校准数据，还有一个校验数据，路由器的无线发射部分是模拟器件，做过模拟产品的弟兄应该都清楚，所用的模拟产品在生产环节都会有校准这一环节，校准后的数据就会放到art分区当中，而且每台设备的校准数据是唯一的，所以在把路由器变成开发板前，最重要的操作就是备份art分区；firmware分区就是U-Boot引导的OpenWrt所在分区。这样目标就确认了，制作一个页面，允许上传三种数据，并刷入相应的分区。
+移植的过程和上一期的过程一样，因为这一期要修改的代码量比较大，所以我在SDK的Code目录下新建了一个Uboot_hpptd文件，这里面为增加web failsafe的U-Boot。
+由于修改的过程比较复杂，我就不以列表式的方式进行讲解，大家可以使用meld比对工具或者beyondcompare工具将SDK目录的Code文件夹下的Uboot和Uboot_httpd两个文件进行比较就能识别出针对webfailsafe功能我修改了哪些内容。
+
+我这里只是为了实现web failsafe的功能，为了避免给您的路由器带来不可恢复的故障，我没有对flash进行具体操作，把具体的操作留给大家自行修改，也算是一个小作业。将固件编译后，加载内存并运行：
+
+可以看到 HTTP server is ready! 这是打开浏览器，在地址栏输入U-Boot的网址，就能看到web failsafe界面：
+
+传说中的“不死U-Boot”就是这样被制作出来的，原理就是利用uIP自带的htttpd协议实现进行修改，使U-Boot具有WBI的交互方式，省去了TTL刷机的繁琐过程，一根网线就能搞定。
+
+这里再具体分析一个问题，我们通常的web服务器都是基于文件系统的，比如将web服务器的根目录指定到一个文件夹，web服务器会自动调用默认的文件应对http请求，而在U-boot中并没有文件系统，我们刚才的web failsafe是怎么实现对指定的html文件进行调用的呢。我们来看一下U-Boot目录下的httpd文件，里面的venders文件夹有一个makefsdatac文件：
+[cpp] view plain copy 
+#!/bin/bash  
+  
+# This script generates "fsdata.c" file for uIP 0.9 stack.  
+# It takes one argument - name of vendor directory,  
+# which should contains all www files, at least:  
+# - index.html (with: <input type="file" name="firmware">)  
+# - 404.html  
+# - flashing.hmtl  
+# - fail.html  
+#  
+# All other files are optional. If you want to allow also  
+# ART and/or U-Boot image update, add the following files,  
+# with appropriate inputs in form:  
+# - art.html (<input type="file" name="art">)  
+# - uboot.html (<input type="file" name="uboot">)  
+#  
+# HTML and CSS files are compressed before placing them  
+# inside "fsdata.c".  
+#  
+# You SHOULDN'T embed addresses of any external  
+# files in "flashing.html" file, because web server,  
+# after receive POST data, returns this page and stops.  
+  
+# Vendor specific directory (default: "general")  
+vendor_dir=${1:-RFDemo}  
+  
+# Temporary files  
+files_content_tmp="vendors/.files_content"  
+files_list_tmp="vendors/.files_list"  
+  
+# YUI Compressor path (should be in the same dir)  
+yui_compressor=`ls -t vendors/*.jar 2> /dev/null | tail --lines=1` 
+ 
+# Previous fsdata_file var name 
+prev_fsdata_struct="NULL" 
+ 
+# Files counter 
+files_counter=0 
+ 
+# Change ASCII to bytes, comma separated (e.g. "0x01, 0x02, 0x03...") 
+function ascii_to_bytes() { 
+    echo -ne $1 | od -A n -t x1 | tr -d '\r\n' | sed 's/ /0x/;s/ /, 0x/g;s/.\{102\}/&\n/g' 
+} 
+ 
+# $1 -> file path 
+function print_data_array() { 
+    local _file_ext="${1##*.}" 
+    local _file_name="${1##*/}"  
+    local _file_name_no_ext="${_file_name%\.*}"  
+    local _file_content=""  
+  
+    # Open variable declaration  
+    `echo -ne "static const char data_"$_file_name_no_ext"_"$_file_ext"[] = {\n" >> "$files_content_tmp"`  
+    `echo -ne "/* HTTP Header */\n" >> "$files_content_tmp"`  
+  
+    # HTTP header (200 OK or 404 Not Found)  
+    if [ "$_file_name_no_ext" == "404"  ]; then  
+        `ascii_to_bytes "HTTP/1.0 404 File not found\r\n" >> "$files_content_tmp"`  
+    else  
+        `ascii_to_bytes "HTTP/1.0 200 OK\r\n" >> "$files_content_tmp"`  
+    fi  
+  
+    # Server type  
+    `echo "," >> "$files_content_tmp"`  
+    `ascii_to_bytes "Server: uIP/0.9\r\n" >> "$files_content_tmp"`  
+    `echo "," >> "$files_content_tmp"`  
+  
+    # Content  
+    if [ "$_file_ext" == "css"  ]; then  
+        if [ -e "$yui_compressor" ]; then  
+            _file_content=`java -jar "$yui_compressor" --charset utf-8 "$1" | od -A n -t x1 | tr -d '\r\n' | sed 's/ /0x/;s/ /, 0x/g;s/.\{102\}/&\n/g'`  
+        else  
+            _file_content=`cat "$1" | tr -d '\r\n\t' | od -A n -t x1 | tr -d '\r\n' | sed 's/ /0x/;s/ /, 0x/g;s/.\{102\}/&\n/g'`  
+        fi  
+        `ascii_to_bytes "Content-type: text/css; charset=UTF-8\r\n\r\n" >> "$files_content_tmp"`  
+    elif [ "$_file_ext" == "png"  ]; then  
+        _file_content=`od -A n -t x1 < "$1" | tr -d '\r\n' | sed 's/ /0x/;s/ /, 0x/g;s/.\{102\}/&\n/g'`  
+        `ascii_to_bytes "Content-Type: image/png\r\n\r\n" >> "$files_content_tmp"`  
+    elif [ "$_file_ext" == "jpg" -o "$_file_ext" == "jpeg"  ]; then  
+        _file_content=`od -A n -t x1 < "$1" | tr -d '\r\n' | sed 's/ /0x/;s/ /, 0x/g;s/.\{102\}/&\n/g'`  
+        `ascii_to_bytes "Content-Type: image/jpeg\r\n\r\n" >> "$files_content_tmp"`  
+    elif [ "$_file_ext" == "gif"  ]; then  
+        _file_content=`od -A n -t x1 < "$1" | tr -d '\r\n' | sed 's/ /0x/;s/ /, 0x/g;s/.\{102\}/&\n/g'`  
+        `ascii_to_bytes "Content-Type: image/gif\r\n\r\n" >> "$files_content_tmp"`  
+    else  
+        _file_content=`cat "$1" | tr -d '\t\r\n' | od -A n -t x1 | tr -d '\r\n' | sed 's/ /0x/;s/ /, 0x/g;s/.\{102\}/&\n/g'`  
+        `ascii_to_bytes "Content-type: text/html; charset=UTF-8\r\n\r\n" >> "$files_content_tmp"`  
+    fi  
+  
+    `echo "," >> "$files_content_tmp"`  
+  
+    # File content  
+    `echo -ne "/* Page/File content */\n" >> "$files_content_tmp"`  
+    `echo -ne "$_file_content" >> "$files_content_tmp"`  
+  
+    # And close declaration  
+    `echo -ne ", 0 };\n\n" >> "$files_content_tmp"`  
+}  
+  
+# $1 -> file path  
+function print_data_struct() {  
+    local _file_ext="${1##*.}"  
+    local _file_name="${1##*/}"  
+    local _file_name_no_ext="${_file_name%\.*}"  
+  
+    `echo -ne "const struct fsdata_file file_"$_file_name_no_ext"_"$_file_ext"[] = {{\n" >> "$files_list_tmp"`  
+    `echo -ne "\t"$prev_fsdata_struct",\n" >> "$files_list_tmp"`  
+    `echo -ne "\t\"/$_file_name_no_ext.$_file_ext\",\n" >> "$files_list_tmp"`  
+    `echo -ne "\tdata_"$_file_name_no_ext"_"$_file_ext",\n" >> "$files_list_tmp"`  
+    `echo -ne "\t(int)sizeof(data_"$_file_name_no_ext"_"$_file_ext") - 1\n" >> "$files_list_tmp"`  
+    `echo -ne "}};\n\n" >> "$files_list_tmp"`  
+  
+    prev_fsdata_struct="file_"$_file_name_no_ext"_"$_file_ext""  
+}  
+  
+# === Main loop ===  
+  
+if [ -d vendors/"$vendor_dir"  ]; then # If vendor dir exists  
+    # Remove old fsdata.c  
+    if [ -a "fsdata.c" ]; then  
+        `rm "fsdata.c"`  
+    fi  
+  
+    `touch "$files_content_tmp" "$files_list_tmp"`  
+  
+    # Loop through all files in vendor dir  
+    for file in vendors/"$vendor_dir"/*; do # For all found files  
+        print_data_array $file  
+        print_data_struct $file  
+        files_counter=$((files_counter+1))  
+    done  
+  
+    # Add required defines  
+    `echo "#define FS_ROOT "$prev_fsdata_struct"" >> "$files_list_tmp"`  
+    `echo "#define FS_NUMFILES "$files_counter"" >> "$files_list_tmp"`  
+  
+    # Generate new fsdata.c  
+    `touch "fsdata.c"`  
+  
+    `cat "$files_content_tmp" > "fsdata.c"`  
+    `cat "$files_list_tmp" >> "fsdata.c"`  
+  
+    `rm "$files_content_tmp" "$files_list_tmp"`  
+else  
+    echo "Error! Vendor specific directory (vendors/"$vendor_dir") doesn't exist!"  
+fi  
+
+这个文件将venders目录下RFDemo文件内的所有html文件抓换成字符串数组，然后在封装成 fsdata_file 结构体，查看fsdata.h中的定义：
+[cpp] view plain copy 
+struct fsdata_file {  
+  const struct fsdata_file *next;  
+  const char *name;  
+  const char *data;  
+  const int len;  
+#ifdef FS_STATISTICS  
+#if FS_STATISTICS == 1  
+  u16_t count;  
+#endif /* FS_STATISTICS */  
+#endif /* FS_STATISTICS */  
+};  
+
+在U-Boot中调用相应的文件变为调用相应的结构体，这就是很多嵌入式设备在没有文件系统的情况下构建http server的思路。
+
+到这里U-Boot相关的内容就基本结束，下一期我们开始接触OpenWrt的内容。
+
+----------------------------------
+SDK下载地址：   https://github.com/aggresss/RFDemo

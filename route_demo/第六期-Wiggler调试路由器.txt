@@ -1,0 +1,3 @@
+第六期 Wiggler调试路由器 《路由器就是开发板》
+JTAG接口的调试器有很多种，一般都很贵RMB四位数的也有，尤其是MIPS的开发板不想ARM市场那么广，所以调试器的价格确实很贵，对于学习研究来说当然还是本着开源共享的原则，所以我们需要探索一条开源免费的调试器方案。经过在论坛的持续潜水终于发现了这个叫Wiggler的东西。
+        Wiggler是世界上最泛滥的一种调试工具，它非常简单，只需要一片74HC244八路正相缓冲器/线路驱动器，几个电阻就可以实现。本来Wiggler是Macraigor（http://www.macraigor.com/）制作的，可以支持Macraigor的OCDRemote这个GDB Server，可以支持ARM、PPC、ColdFire、MIPS、XScale等多种CPU。后来因为它结构太简单，被人破解后搞得全世界都是，于是Macraigor怒了，现在用OCDRemote必须是Macraigor原厂的Wiggler了……尽管如此，后人又在Wiggler的硬件基础上开发了很多的调试工具，例如H-Jtag；另外也有其他的调试工具增加了对Wiggler的支持，例如OpenOCD。Wiggler电缆的成本特别低，当然它的性能也和成本一样低，使用上一期提到的Jlink的下载速度在35KB/S左右，而使用Wiggler的速度仅在3.5KB/S左右，而且你需要知道的是，Wiggler使用DB25并口与主机通讯，这要求你的主机上必须有并口，如果使用USB转并口，那转换器的价格足以买个支持USB的调试器啦。它有这么多的缺点但依然支持它，因为我支持的是一种硬件开源的精神。

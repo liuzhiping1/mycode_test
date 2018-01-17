@@ -1,0 +1,88 @@
+这一期我们来分析一下U-Boot中TTL串口输出是怎么实现的，我们带着这个疑问来分析U-Boot的源文件。
+
+        TTL的电气原理是这样的：发送数据时，CPU将并行数据写入UART，UART按照一定的格式在一根电线上串行发出；接收数据时，UART检测另一根电线上的信号，串行收集然后放在缓冲区中，CPU即可读取UART获得这些数据。UART之间以全双工方式传输数据，最精确的连线方法只有3根电线：TXD用于发送数据，RXD用于接收数据，GND用于给双发提供参考电平，连线如下：
+
+
+
+那么在U-Boot软件结构上是如何将信息输出的呢，我们来分析一下源文件。首先说一下我们的分析思路，因为我们现在已经可以通过TTL输出信息到屏幕，疑问点是这个功能是如何实现的，所以这是一个逆向的过程，我们要通过最终的实现一级一级的向上追溯。
+在U-Boot初始化过程中会打印出很多信息，那么我们就从初始化的函数board_init_r()开始分析，./lib_mips/board.c文件中第1109行，细看board_init_r()函数会发现，终端输出直接调用printf()函数，跳转到printf()函数的定义处：
+[cpp] view plain copy
+void printf (const char *fmt, ...)  
+{  
+    va_list args;  
+    uint i;  
+    char printbuffer[CFG_PBSIZE];  
+  
+    va_start (args, fmt);  
+  
+    /* For this to work, printbuffer must be larger than 
+     * anything we ever want to print. 
+     */  
+    i = vsprintf (printbuffer, fmt, args);  
+    va_end (args);  
+  
+    /* Print the string */  
+    puts (printbuffer);  
+}  
+可见是一个可变参数的函数，关键点是调用了puts()函数来进行输出，再跳转到puts()函数
+[cpp] view plain copy
+void puts (const char *s)  
+{  
+    DECLARE_GLOBAL_DATA_PTR;  
+  
+#ifdef CONFIG_SILENT_CONSOLE  
+    if (gd->flags & GD_FLG_SILENT)  
+        return;  
+#endif  
+  
+    if (gd->flags & GD_FLG_DEVINIT) {  
+        /* Send to the standard output */  
+        fputs (stdout, s);  
+    } else {  
+        /* Send directly to the handler */  
+        serial_puts (s);  
+    }  
+}  
+到这里产生了分支，通过条件判断调用了fputs (stdout, s)和serial_puts (s)来实现输出功能，这里限于篇幅的原因，我们选择跟踪serial_puts()函数，有兴趣的读者可以尝试跟踪一下fputs()函数，它的实现是比较复杂的，涉及到了U-Boot的全局变量和设备模型，但在RT3052的SOC实现里fputs()函数最终还是通过调用serial_puts()函数来实现的，所以我们直接跟进serial_puts
+ ()函数，定义在./board/rt2880/serial.c第332行：
+[cpp] view plain copy
+void  
+serial_puts (const char *s)  
+{  
+    while (*s) {  
+        serial_putc (*s++);  
+    }  
+}  
+可以看出，serial_puts()就是serial_putc()的循环，以一个字符为单位，再跟进serial_putc() :
+[cpp] view plain copy
+void serial_putc (const char c)  
+{  
+    /* wait for room in the tx FIFO on UART */  
+    while ((LSR(CFG_RT2880_CONSOLE) & LSR_TEMT) == 0);  
+  
+    TBR(CFG_RT2880_CONSOLE) = c;  
+  
+    /* If \n, also do \r */  
+    if (c == '\n')  
+        serial_putc ('\r');  
+}  
+这个参数用到了很多带参数的宏，比如：
+TBR(CFG_RT2880_CONSOLE) = c;
+其中TBR在./board/rt2880/serial.h第40行定义
+[cpp] view plain copy
+ #define TBR(x)     __REG(RT2880_UART_CFG_BASE+(x)+RT2880_UART_TBR_OFFSET)  
+#define RT2880_UART_CFG_BASE (RT2880_CHIP_REG_CFG_BASE)  
+#define RT2880_CHIP_REG_CFG_BASE    (RALINK_SYSCTL_BASE)  
+#define RALINK_SYSCTL_BASE      0xB0000000  
+#define RT2880_UART_TBR_OFFSET  0x04  
+#  define __REG(x)  (*((volatile u32 *)io_p2v(x)))  
+#define CFG_RT2880_CONSOLE  RT2880_UART2   /* we use UART Lite for console */  
+#define RT2880_UART2    0x0C00  /* UART Lite */  
+经过以上分析可以将 TBR(CFG_RT2880_CONSOLE) = c; 拓展成 (*((volatile u32 *)(0xB0000000+0x0C00+0x04))) = c;即向地址为(0xB0000000+0x0C00+0x04)的寄存器内写入变量c的数据;
+这是我们打开RT3052的DataSheet查找UART相关的寄存器信息可以看到：
+
+这个寄存器的地址名称是TBR(Transmit Buffer Register)，也就是发送缓冲器，只要将8位的数据也就是字符的ASCII码写入这个寄存器，在下一个传输周期就会将数据通过UART发送出去。
+到这里我们初步的探索了TTL是怎样输出数据的，主要是要理解封装这个概念，能够领悟硬件的寄存器操作是怎样一层一层的封装，最后通过函数的方式提供给上层模块调用。其实驱动程序就是实现这样的功能，比如我们在windows下编程对硬件的控制往往都是厂商提供的SDK，我们只是进行调用就能控制硬件，其实追溯到底层原理是同样的，都是对寄存器的读写操作。记得当年学VHDL设计时的层级模型 开关级<--逻辑门级<--寄存器传输级<--算法级<--系统级，这里我们会发现在分析向U-Boot这样的底层应用很多情况下就是在分析算法级是怎样转换为寄存器传输级的。
+U-Boot的硬件模型很多都是从linux的driver model里移植过来的，所以尝试去理解U-Boot的driver组织架构可以为分析linux内核奠定很好的基础，所以如果你有时间有兴趣，建议你更深层次的分析U-Boot的net,flash,usb模块相应的实现原理。
+----------------------------------------------------
+SDK下载地址：   https://github.com/aggresss/RFDemo
