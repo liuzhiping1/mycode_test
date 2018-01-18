@@ -783,5 +783,129 @@ ip route flush cache
 			sudo cp -r rootfs/*  tmpfs/
 			sudo umount tmpfs
 	启动：qemu-system-arm -M vexpress-a9 -m 512M -kernel zImage -nographic -append "root=/dev/mmcblk0 console=ttyAMA0" -sd /opt/Hi3516A_SDK_V1.0.6.0/osdrv/opensource/busybox/a9rootfs.ext3  【成功启动！！！】
---------------------------【key: 路由器就是开发板】--------------------------------------------------------------------------------------------------------------------------------
+--------------------------【key: 路由器就是开发板,虚拟机就是开发板】--------------------------------------------------------------------------------------------------------------------------------
 http://blog.csdn.net/aggresss/article/details/52753098 路由器就是开发板：应用openWrt系统的路由器【这个一定要试一试】
+http://blog.csdn.net/aggresss/article/details/74834155  虚拟机就是开发板  【这个关于qemu实践的更加详细靠谱一点，u-boot是2017-1版本，linux-kernel是4.1.38版本，busybox版本是1.26.2】
+http://www.linuxfromscratch.org/  LFS
+http://ftp.denx.de/pub/u-boot/ u-boot 【 export ARCH=arm ;export CROSS_COMPILE=arm-linux-gnueabi-;make vexpress_ca9x4_defconfig;make】
+==1. 首先安装交叉编译器，执行： sudo apt-get install gcc-arm-linux-gnueabi
+==        2. 下载U-Boot源文件： http://ftp.denx.de/pub/u-boot/ 我下载的是 u-boot-2017.01.tar.bz2
+==        3. 解压源文件  tar jvxf u-boot-2017.01.tar.bz2 -C xxxx  （xxx为需要解压的目录）
+==        4. 进入U-Boot 源文件目录，然后执行：
+==                export ARCH=arm 
+==                export CROSS_COMPILE=arm-linux-gnueabi-
+==                make vexpress_ca9x4_defconfig
+==                make
+==                编译完成后，如果目录下生成 u-boot 文件，则说明编译成功。
+==        5. 在U-Boot源码目录下编写脚本 run.sh
+==                qemu-system-arm \
+==                    -M vexpress-a9 \
+==                    -nographic \
+==                    -m 512M \
+==                    -kernel u-boot
+==        然后 chmod +x run.sh 增加文件执行权限。
+==        6. 最后执行  ./run.sh
+https://www.kernel.org/pub/linux/kernel/  linux-kernel 【export ARCH=arm ;export CROSS_COMPILE=arm-linux-gnueabi- ; make vexpress_defconfig; make zImage; make modules; make dtbs】
+https://busybox.net/downloads/  busybox
+**第一步：编译内核
+**        1. 首先安装交叉编译器，执行： sudo apt-get install gcc-arm-linux-gnueabi
+**        2. 下载内核源文件 https://www.kernel.org/pub/linux/kernel/ ，我这里下载的是 4.1.38 版本，一个比较稳定的版本；
+**        3.解压内核  tar zvxf linux-4.1.38.tar.gz -C xxxx  （xxxx为需要解压的目录）
+**        4. 进入kernel 源文件目录，然后执行：
+**                export ARCH=arm 
+**                export CROSS_COMPILE=arm-linux-gnueabi-
+**                make vexpress_defconfig
+**                make zImage
+**                make modules
+**                make dtbs
+**                编译后生成 在 arch/arm/boot 目录下生成 zImage 文件，则说明编译成功。
+**        第二步：制作根文件系统
+**        1.制作根文件系统首先要生成一个虚拟磁盘，创建一个虚拟磁盘的两种方法：
+**                dd if=/dev/zero of=vexpress.img bs=512 count=$((2*1024*100))
+**                qemu-img create -f raw vexpress.img 100M
+**        这两种方法任选一种执行就可以，目的就是生成一个vexpress.img的虚拟镜像文件，为了更好的兼容性选择 raw 格式的镜像。
+**        2.虚拟磁盘中创建分区并修改：
+**                (1). fdisk vexpress.img ，然后使用n命令创建分区，各种下一步就行；
+**                (2). losetup /dev/loop0 vexpress.img ，挂载vexpress.img到/dev/loop0设备上；
+**                (3). partx -u /dev/loop0 ，使用partx命令让系统刷新系统的分区信息；
+**                (4). mkfs.ext2 /dev/loop0p1 ，制作ext2格式的文件系统；
+**                (5). mkdir rootfs ，建立一个rootfs目录用来作为挂载目录，
+**                      mount -o loop /dev/loop0p1 ./rootfs ，将生成的ext2格式的分区挂载到rootfs目录；
+**                (6). 执行到这里虚拟磁盘就已经制作好了，下面的两个步骤是卸载磁盘时的操作，可以先跳过，直接到第三节去编译 busybox；
+**                (7). partx -d /dev/loop0 ，卸载loop0设备下的分区； 如果执行不成功可以试试  sudo umount -f rootfs
+**                (8). losetup -d /dev/loop0 ，卸载loop0设备；
+**                说明：
+**                如果直接使用 mkfs.ext3 写入img文件，无法使用fdisk显示分区信息；
+**                fdisk n命令 默认的first sector 是2048扇区；默认分区名为 文件名+分区序号；
+**                mount 挂载空分区会报错 wrong fs type, bad option, bad superblock；
+**                losetup /dev/loop0 vexpress.img 命令相当于mount命令中的 -o loop 参数；
+**                partx -u /dev/loop0  强制内核刷新可识别分区；
+**                查看分区类型  df -Th；
+**        3.编译 Busybox：
+**                (1). 下载Busybox https://busybox.net/downloads/ ，我下载的版本是 1.26.2 ，一个比较稳定的版本；
+**                (2). 解压内核  tar jvxf busybox-1.26.2.tar.bz2 -C xxxx  （xxx为需要解压的目录）
+**                (3). 进入 Busybox 源文件目录下执行 make menuconfig
+**                        做如下配置：
+**[cpp] view plain copy
+**Busybox Settings  --->  
+**    Build Options  --->  
+**        [*] Build BusyBox as a static binary (no shared libs)  
+**        (arm-linux-gnueabi-) Cross Compiler prefix  
+**                        使用交叉编译器编译Busybox
+**                (4). 执行 make 编译Busybox  【编译busubox会有一些错误，把它们在配置的时候去掉就行，不编了】
+**                (5). 执行 make install 会在 _install 目录下生成 需要的文件 bin linuxrc sbin usr  ；
+**        4.制作根文件系统：
+**                (1). 拷贝busybox
+**                        sudo cp -raf busybox/_install/*  rootfs/
+**                (2). 拷贝运行库
+**                        sudo cp -arf /usr/arm-linux-gnueabi/lib rootfs/
+**                        sudo rm rootfs/lib/*.a
+**                        sudo arm-linux-gnueabi-strip rootfs/lib/*
+**                (3). 创建必要目录
+**                        sudo mkdir -p rootfs/proc/
+**                        sudo mkdir -p rootfs/sys/
+**                        sudo mkdir -p rootfs/tmp/
+**                        sudo mkdir -p rootfs/root/
+**                        sudo mkdir -p rootfs/var/
+**                        sudo mkdir -p rootfs/mnt/
+**                (4). 创建必要节点
+**                        sudo mkdir -p rootfs/dev/
+**                        sudo mknod rootfs/dev/tty1 c 4 1
+**                        sudo mknod rootfs/dev/tty2 c 4 2
+**                        sudo mknod rootfs/dev/tty3 c 4 3
+**                        sudo mknod rootfs/dev/tty4 c 4 4
+**                        sudo mknod rootfs/dev/console c 5 1
+**                        sudo mknod rootfs/dev/null c 1 3
+**                (5). 制作必要etc文件
+**                        etc 目录下的必要文件有5个：fstab，init.d/rcS，inittab，profile，sysconfig/HOSTNAME
+**                        我把这五个文件放到 https://github.com/aggresss/LKDemo 中 tools 目录下的 etc.tar.gz 里，可以下载并解压后使用；
+**                        sudo cp -arf etc rootfs/
+**        到这里根文件系统就已制作完成，退出rootfs目录并执行 losetup -d /dev/loop0 卸载虚拟磁盘文件。
+**        第三步：调试运行
+**        1. 启动Linux最小系统需要我们刚才生成的3个文件：
+**                (1). Linux kernel目录下 arch/arm/boot/dts/vexpress-v2p-ca9.dtb  文件；
+**                (2). Linux kernel目录下 arch/arm/boot/zImage 文件
+**                (3). 生成的虚拟磁盘文件： vexpress.img；
+**        将这三个文件放到同一个目录下。
+**        2. 制作启动脚本：
+**                在上面三个文件的同目录下创建启动脚本 vim run_linux.sh
+**[cpp] view plain copy
+**qemu-system-arm \  
+**    -nographic \  
+**    -sd vexpress.img \  
+**    -M vexpress-a9 \  
+**    -m 512M \  
+**    -kernel zImage \  
+**    -dtb vexpress-v2p-ca9.dtb \  
+**    -smp 4 \  
+**    -append "init=/linuxrc root=/dev/mmcblk0p1 rw rootwait earlyprintk console=ttyAMA0"  
+**                增加可执行权限 chmod +x run_linux.sh
+**        3. 调试运行：
+**                执行 ./run_linux.sh，即可在模拟的开发板上运行Linux系统，下面是运行后的截图：
+**
+**                
+**
+**        4. 关闭模拟开发板进程：
+**
+**                将下面的命令做成脚本运行便可以彻底关闭已经运行的QEMU进程：
+**                ps -A | grep qemu-system-arm | awk '{print $1}' | xargs sudo kill -9

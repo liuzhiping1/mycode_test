@@ -1,0 +1,25 @@
+第三期 QEMU调试U-Boot实验 《虚拟机就是开发板》 http://blog.csdn.net/aggresss/article/details/54945726
+这一期注定会很简短，简短的意义就在于使用模拟器做某些事情确实很快捷。这一期我们使用QEMU来模拟运行U-Boot，大家对U-Boot应该都不陌生，相当于Linux的学前班，U-Boot的数据结构定义和驱动模型定义都采用Linux风格，在研究Linux内核前分析一下U-Boot会大有裨益。
+        记得第一次用物理开发板调试U-Boot时，怎么把U-Boot下载到开发板就让我研究了一星期，把有限的精力都浪费在了物理性的问题上了，而对于U-Boot的内部软件架构就会分散一些精力。下面我们来实践一下在模拟器上运行U-Boot，如果你之前没有编译过U-Boot，没有把它下载到物理开发板并运行过，都不要紧，只要按照下面的操作来，20分钟走完全程。
+        1. 首先安装交叉编译器，执行： sudo apt-get install gcc-arm-linux-gnueabi
+        2. 下载U-Boot源文件： http://ftp.denx.de/pub/u-boot/ 我下载的是 u-boot-2017.01.tar.bz2
+        3. 解压源文件  tar jvxf u-boot-2017.01.tar.bz2 -C xxxx  （xxx为需要解压的目录）
+        4. 进入U-Boot 源文件目录，然后执行：
+                export ARCH=arm 
+                export CROSS_COMPILE=arm-linux-gnueabi-
+                make vexpress_ca9x4_defconfig
+                make
+                编译完成后，如果目录下生成 u-boot 文件，则说明编译成功。
+        5. 在U-Boot源码目录下编写脚本 run.sh
+                qemu-system-arm \
+                    -M vexpress-a9 \
+                    -nographic \
+                    -m 512M \
+                    -kernel u-boot
+        然后 chmod +x run.sh 增加文件执行权限。
+        6. 最后执行  ./run.sh
+        
+
+        到这里，你已经搭建好了一个U-Boot的调试环境。如果你想研究一下U-Boot，这是一个非常好的开始，没必要被那些物理性的各种未知问题所困扰。
+        理解U-Boot内部运行原理的一个捷径就是对它进行修改，然后验证性的调试运行，这样能为你揭示出仅仅通过看代码无法看到的深层机理。
+        上面这些步骤是不是很快就完成了，我们用最短的时间制作出了一个U-Boot的调试验证环境，接下来怎么去分析和研究U-Boot就看你的啦。

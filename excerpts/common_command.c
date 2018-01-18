@@ -66,3 +66,23 @@ dd if=   of=    转换文件-convert and copy a file
 ldd myprog | grep libc    -- print shared object dependencies
 showmount - show mount information for an NFS server
 seq 打印数的序列
+【制作根文件系统首先要生成一个虚拟磁盘，创建一个虚拟磁盘的两种方法：】
+     dd if=/dev/zero of=vexpress.img bs=512 count=$((2*1024*100))
+     qemu-img create -f raw vexpress.img 100M
+【虚拟磁盘中创建分区并修改】
+     (1). fdisk vexpress.img ，然后使用n命令创建分区，各种下一步就行；
+     (2). losetup /dev/loop0 vexpress.img ，挂载vexpress.img到/dev/loop0设备上；
+     (3). partx -u /dev/loop0 ，使用partx命令让系统刷新系统的分区信息；
+     (4). mkfs.ext2 /dev/loop0p1 ，制作ext2格式的文件系统；
+     (5). mkdir rootfs ，建立一个rootfs目录用来作为挂载目录，
+           mount -o loop /dev/loop0p1 ./rootfs ，将生成的ext2格式的分区挂载到rootfs目录；
+     (6). 执行到这里虚拟磁盘就已经制作好了，下面的两个步骤是卸载磁盘时的操作，可以先跳过，直接到第三节去编译 busybox；
+     (7). partx -d /dev/loop0 ，卸载loop0设备下的分区； 如果执行不成功可以试试  sudo umount -f rootfs
+     (8). losetup -d /dev/loop0 ，卸载loop0设备；
+     说明：
+     如果直接使用 mkfs.ext3 写入img文件，无法使用fdisk显示分区信息；
+     fdisk n命令 默认的first sector 是2048扇区；默认分区名为 文件名+分区序号；
+     mount 挂载空分区会报错 wrong fs type, bad option, bad superblock；
+     losetup /dev/loop0 vexpress.img 命令相当于mount命令中的 -o loop 参数；
+     partx -u /dev/loop0  强制内核刷新可识别分区；
+     查看分区类型  df -Th；
