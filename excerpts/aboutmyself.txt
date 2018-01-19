@@ -1,1 +1,12 @@
 51/pic with assemble -> arm with C -->linux on arm refer to shell /git tools  -> video on hisilicon->AI on enbed
+
+1、确定machine的功能
+2、确定cpu类型，内核，外设模块，通信模块、存储模块
+3、确定linux系统版本、busybox版本、uboot版本
+4、确定通信类型，wifi模块、蓝牙模块
+5、设计功能模块
+6、写代码实现驱动和应用
+【C代码，工程脚本，linux，一种arm-a9芯片，网络知识，busybox，u-boot，arm-汇编，产品】
+【调试代码的能力，学习能力，动手能力】
+【基础：linux、网络、arm、USB、ethernet。。。】夯实基础
+【提升：视频处理、wifi】扎进提升

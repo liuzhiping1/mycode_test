@@ -1,0 +1,20 @@
+:vsplit 垂直分屏
+set hlsearch
+set number
+" 自动缩进
+set autoindent
+set cindent
+" Tab键的宽度
+set tabstop=4
+" 统一缩进为4
+set softtabstop=4
+set shiftwidth=4
+" 不要使用vi的键盘模式，而是vim自己的
+set nocompatible
+" 语法高亮
+set syntax=on
+"自动保存
+set autowrite
+"set ruler           " 显示标尺 
+set showcmd         " 输入的命令显示出来，看的清楚些
+ set cursorline

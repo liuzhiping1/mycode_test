@@ -828,9 +828,9 @@ https://busybox.net/downloads/  busybox
 **                (1). fdisk vexpress.img ，然后使用n命令创建分区，各种下一步就行；
 **                (2). losetup /dev/loop0 vexpress.img ，挂载vexpress.img到/dev/loop0设备上；
 **                (3). partx -u /dev/loop0 ，使用partx命令让系统刷新系统的分区信息；
-**                (4). mkfs.ext2 /dev/loop0p1 ，制作ext2格式的文件系统；
+**                (4). mkfs.ext2 /dev/loop0 ，制作ext2格式的文件系统；
 **                (5). mkdir rootfs ，建立一个rootfs目录用来作为挂载目录，
-**                      mount -o loop /dev/loop0p1 ./rootfs ，将生成的ext2格式的分区挂载到rootfs目录；
+**                      mount -o loop /dev/loop0 ./rootfs ，将生成的ext2格式的分区挂载到rootfs目录；
 **                (6). 执行到这里虚拟磁盘就已经制作好了，下面的两个步骤是卸载磁盘时的操作，可以先跳过，直接到第三节去编译 busybox；
 **                (7). partx -d /dev/loop0 ，卸载loop0设备下的分区； 如果执行不成功可以试试  sudo umount -f rootfs
 **                (8). losetup -d /dev/loop0 ，卸载loop0设备；
@@ -905,7 +905,16 @@ https://busybox.net/downloads/  busybox
 **
 **                
 **
-**        4. 关闭模拟开发板进程：
-**
+**        4. 关闭模拟开发板进程：**
 **                将下面的命令做成脚本运行便可以彻底关闭已经运行的QEMU进程：
 **                ps -A | grep qemu-system-arm | awk '{print $1}' | xargs sudo kill -9
+--------------------------【key: vim】--------------------------------------------------------------------------------------------------------------------------------
+20180118:
+【vim】设置好了tags文件，在定位变量/函数的定义时，最常用的快捷键是：Ctrl + ]，分屏：: 'set vsplit file' 切换分屏光标 ：'Ctrl + w'
+【解决qemu启动失败：audio驱动问题】-按照提示输入export QEMU_AUDIO_DRV=wav;export QEMU_WAV_PATH=$HOME/tune.wav 即可。
+
+==韦东山-嵌入式linux开发完全手册：编译进内核的入口是cs89x0_probe，编译成模块的入口函数是init_module。为什么是这样？
+1、arm-hisiv300-linux-objcopy -O binary -R .note -R .comment -S vmlinux linux.bin -> 2、gzip -9 linux.bin -> 3、 mkimage -A arm -O linux -T kernel -C gzip -a 0x30008000 -e 0x30008000 -n "Linux Kernel Image" -d linux.bin.gz uImage【mkimage工具在编译u-boot后的tools中有】
+【Bootloader与Kernel间参数传递机制】：linux-- arch/arm/include/asm/setup.h   u-boot--arch/arm/include/asm/setup.h ，u-boot和linux中定义相同的数据结构，u-boot把参数放在数据结构中，把地址传递给内核，实现数据的单向传递。
+--------------------------【key: 】--------------------------------------------------------------------------------------------------------------------------------
+20180119
