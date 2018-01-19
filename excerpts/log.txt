@@ -911,10 +911,35 @@ https://busybox.net/downloads/  busybox
 --------------------------【key: vim】--------------------------------------------------------------------------------------------------------------------------------
 20180118:
 【vim】设置好了tags文件，在定位变量/函数的定义时，最常用的快捷键是：Ctrl + ]，分屏：: 'set vsplit file' 切换分屏光标 ：'Ctrl + w'
+		{ctags（Generate tag files for source code）是vim下方便代码阅读的工具。尽管ctags也可以支持其它编辑器，但是它正式支持的只有VIM。并且VIM中已经默认安装了Ctags，它可以帮助程序员很容易地浏览源代码。
+		熟练的使用ctags仅需记住下面七条命令：
+		1．$ctags –R * ($为Linux系统Shell提示符,这个命令上面已经有所介绍)
+		2. $ vi –t tag (请把tag替换为您欲查找的变量或函数名)
+		3．:ts(ts助记字：tagslist, “:”开头的命令为VI中命令行模式命令)
+		4．:tp(tp助记字：tagspreview)---此命令不常用，可以不用记
+		5．:tn(tn助记字：tagsnext) ---此命令不常用，可以不用记
+		6．Ctrl+ ]跳到光标所在函数或者结构体的定义处
+		7．Ctrl+ T返回查找或跳转
+		“$vi –t tag” ：在运行vim的时候加上“-t”参数，例如：[/usr/src]$vim -tmain这个命令将打开定义“main”（变量或函数或其它）的文件，并把光标定位到这一行。如果这个变量或函数有多处定义，
+		在VI命令行模式 “：ts”命令就能列出一个列表供用户选择。
+		“：tp”为上一个tag标记文件，
+		“：tn”为下一个tag标记文件。
+		当然，若当前tags文件中用户所查找的变量或函数名只有一个，“:tp,:tn”命令不可用。
+		（最方便的方法是把光标移到变量名或函数名上，然后按下“Ctrl+]”，这样就能直接跳到这个变量或函数定义的源文件中，并把光标定位到这一行。用“Ctrl+T”可以退回原来的地方。即使用户使用了N次“Ctrl+]”查找了N个变量，按N次“Ctrl+t”也能回到最初打开的文件，它会按原路返回 。
+		注意：运行vim的时候，必须在“tags”文件所在的目录下运行。否则，运行vim的时候还要用“:set tags=”命令设定“tags”文件的路径，这样vim才能找到“tags”文件。在完成编码时，可以手工删掉tags文件}
 【解决qemu启动失败：audio驱动问题】-按照提示输入export QEMU_AUDIO_DRV=wav;export QEMU_WAV_PATH=$HOME/tune.wav 即可。
 
 ==韦东山-嵌入式linux开发完全手册：编译进内核的入口是cs89x0_probe，编译成模块的入口函数是init_module。为什么是这样？
 1、arm-hisiv300-linux-objcopy -O binary -R .note -R .comment -S vmlinux linux.bin -> 2、gzip -9 linux.bin -> 3、 mkimage -A arm -O linux -T kernel -C gzip -a 0x30008000 -e 0x30008000 -n "Linux Kernel Image" -d linux.bin.gz uImage【mkimage工具在编译u-boot后的tools中有】
 【Bootloader与Kernel间参数传递机制】：linux-- arch/arm/include/asm/setup.h   u-boot--arch/arm/include/asm/setup.h ，u-boot和linux中定义相同的数据结构，u-boot把参数放在数据结构中，把地址传递给内核，实现数据的单向传递。
---------------------------【key: 】--------------------------------------------------------------------------------------------------------------------------------
-20180119
+--------------------------【key: 看完书后就多看代码】--------------------------------------------------------------------------------------------------------------------------------
+20180119：
+http://releases.linaro.org/components/toolchain/binaries/6.1-2016.08/ arm交叉编译工具链
+【qemu】qemu-system-arm -nographic -M vexpress-a9 -m 512M -kernel zImage -dtb vexpress-v2p-ca9.dtb -append "init=linuxrc root=/dev/mmcblk0p1 rw rootwait earlyprintk console=ttyAMA0"  今天又有点反应了！！！【注意：昨天没有反应的原因是因为脚本里面的console和‘=’之间有个空格】
+【总结一下】1、uboot-2017.01：引导内核启动的程序，支持多种cpu和系统，当前我只关注arm系统的a9芯片，uboot在进行两个阶段的引导之后把控制权交给linux内核，在某个区域存放了传递给内核的参数，利用taglist，他们定义相同的数据类型，uboot把地址给内核，交叉编译生成uboot映像。
+2、busybox-1.26.2：在嵌入式系统上的shell工具，在编译的时候定制一下就行，然后编译安装，生成一个文件夹_install，具体可以查看Makefile和Kconfig
+3、linux3.4.35：配置、编译zImage、编译modules、安装modules_install、make dtbs.
+4、qemu：qemu-system-arm -nographic -M vexpress-a9 -m 512M -kernel zImage -dtb vexpress-v2p-ca9.dtb -append "init=linuxrc root=/dev/mmcblk0p1 rw rootwait earlyprintk console=ttyAMA0"  
+5、制作根文件系统：dd if=/dev/zero of=vexpress.img bs=512 count=$((1024*2*100)) 生成100M的数据文件，mkfs.ext3 vexpress.img 格式化改文件，然后用mount -t ext3 vexpress.img tmpfs/ 直接把vexpress.img挂载在tmpfs上，之后就可以像普通文件一样往里面添加或删除文件了，df -T|l 查看tmpfs挂在那个loop上，通过umount /dev/loop? 卸载。
+
+内核的组成部分：进程调度，内存管理、虚拟文件系统、进程间通信、网络接口

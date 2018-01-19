@@ -88,3 +88,4 @@ seq 打印数的序列
      查看分区类型  df -Th；
 ctags -R 生成tags文件
 vim command- :set tags=/path/tags 设置当前tag文件，“Ctrl + ]” 定位定义的地方，“Ctrl + o/t ”组合快捷键返回，【重要：gd组合键-对光标所在处的word进行快捷查找定位】
+pstree 进程树
