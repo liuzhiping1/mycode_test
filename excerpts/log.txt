@@ -960,3 +960,100 @@ Linux的设备驱动程序可以分为3个主要组成部分：
 如果对共享资源的访问时间非常短，自旋锁也是好的选择。
 但是，如果被保护的共享资源需要在中断上下文访问
 （包括底半部即中断处理句柄和顶半部即软中断），就必须使用自旋锁。
+--------------------------【key: 驱动开发】-第六章和第七章-------------------------------------------------------------------------------------------------------------------------------
+20180123：
+驱动的学习呢是先熟悉机制，再熟悉内核接口，再实践开发。这个是基本的理论学习路线。当前要熟悉内核接口。
+【字符设备内核接口】：结构体cdev，cdev_init(),cdev_alloc(),cdev_put(),cdev_add(),cdev_del(),[un]register_chrdev_region(),alloc_chrdev_region(),copy_to_user(),copy_from_user(),
+字符设备的组成：加载/卸载函数，file_operations结构体中的成员函数
+【通过vim-ctags查看源码】【总结：字符设备主要围绕cdev结构体】【强调：linux的面向对象和分层思想，数据和方法的封装】【坚持学习linux技术，夯实基础打磨驱动】
+【驱动的并发控制】并发和竞态-1、多cpu，2、单cpu内进程和抢占它的进程3、中断（硬中断、软中断、tasklet、底半部）与进程之间。
+解决竞态问题的途径就是保证对共享资源的互斥访问，就是一个执行单元在访问共享资源的时候，其他的执行单元被禁止访问。访问共享资源的代码区域称为【临界区】，临界区需要被某种互斥机制加以保护。【中断屏蔽、原子操作、自旋锁、信号量、互斥体等】这些途径可以实现互斥。
+【编译乱序和执行乱序】编译乱序是编译器优化的结果，可以用编译屏障barrier()
+以下为并发控制机制：
+【1中断屏蔽】驱动不推荐，中断屏蔽使得中断与进程之间的并发不再发生，而且linux内核的进程调度等操作都依赖中断来实现，内核抢占进程之间的并发也避免了。内核接口：local_irq_disable(),local_irq_enable(),它们只能禁止和使能本cpu内的中断，因此并不能解决smp多cpu的竞态，驱动中使用它们通常意味着一个bug，还有local_irq_save(flag)/local_bh_disable()
+【2原子操作】linux内核提供的原子操作分两类，分别针对位和整形变量进行原子操作。位和整形变量的原子操作都依赖于底层cpu的原子操作，因此所有这些函数都与cpu架构密切相关。整形原子操作：atomic_set(atomic_t *v , int i)/ATOMIC_INIT()/atomic_read()/atomic_add(int i , atomic_t)/atomic_sub(int i,atomic_t *v)/set_bit(nr,void *addr)
+【3自旋锁】在arm体系架构下，自旋锁的实现借用了ldrex指令、strex指令、ARM处理器内存屏障指令dmb和dsb、wfe指令和sev指令。既要保证排他性，也要处理好内存屏障。4种操作：1、定义自旋锁 spinlock_t lock; 2、初始化自旋锁 spin_lock_init(lock) 3、获得自旋锁 spin_lock(lock) 该宏成功获得锁就马上返回，否则自旋直到自旋锁的保持者释放。 spin_trylock(lock) 该宏不阻塞，获得成功就返回true，失败就返回false，实际上不再“在原地打转了” 4、spin_unlock(lock)
+spin_lock/spin_unlock是自旋锁机制的基础，他们和关开中断local_irq_disable(able)、关开底半部local_bh_disable(able)、关开中断并保存状态字local_irq_save()/local_irq_restore()结合形成了整套自旋锁机制。
+spin_lock_irq() = spin_lock() + local_irq_disable()
+spin_lock_irqsave() = spin_lock() + local_irq_save()
+spin_lock_bh() = spin_lock() + lock_bh_disable() 解锁的同理。
+使用自旋锁期间不能调用可能引起进程调度的函数，如copy_from_user()/copy_to_user()/kmalloc()/msleep()等函数，可能导致内核崩溃。
+【4读写自旋锁】rwlock_t lock; rwlock_init(&lock);read_lock(&lock);write_lock_irqsave(&lick)在读的时候是可以并发的，所以多个进程同时读的话应该不锁，所以自旋锁衍生出了读写自旋锁，它允许读的并发，但是写操作只能最多一个写进程
+【5顺序锁】读写自旋锁的进一步优化，允许读写同时进行，但是读的期间发生了写操作那么读操作要重新读以保证完整性。具体见书上page-175
+【6读-复制-更新RCU】
+详见书上178页
+【7信号量】1、定义 struct semaphore sem；2、初始化 void sema_init(struct semaphore *sem,int val);3、获得信号量 void down(struct semaphore *sem);该函数用于获得信号量sem，会导致*睡眠*，因此不能在中断上下文中使用，int down_interruptible(struct semaphore * sem);类似down()，但是能够被信号打断，打断之后返回值非0. int down_trylock()不会导致调用者睡眠，可以用在中断上下文中。
+4、释放信号量 void up(struct semaphore * sem),释放信号量sem，唤醒等待者
+【8互斥体】用在用户空间，应该和信号量用法类似
+【3项原则】1、当锁不能获得的时候，使用互斥体的开销是进程上下文切换时间，自旋锁的开销是等待获得自旋锁（由临界区执行时间决定），若临界区比较小，用自旋锁，若临界区大使用互斥体。2、互斥体所保护的临界区可以包含可能引起阻塞的代码，二自旋锁则绝对要避免用来保护包含这样的代码的临界区。因为阻塞意味着要进行进程的切换，如果进程切换出去后，另一个进程企图获得本自旋锁就会发生死锁了。3、互斥体存在于进程上下文，因此被保护的共享资源需要在中断和软中断情况下使用，则在互斥体和自旋锁之间只能使用自旋锁。当然一定要用互斥体则只能通过mutex_trylock的方式进行，不能获取就要立即返回以避免阻塞。
+【9完成量】用于一个执行单元等待另一个执行单元执行完某事。1、定义 struct completion my_completion；2、初始化 init_completion(&my_completion);3、等待完成量 void wait_forcompletion(struct completion *c);4、唤醒完成量 void complete(struct completion *c);void complete_all(struct completion *c)
+【第八章 linux设备中的阻塞和非阻塞I/O】
+	1、阻塞I/O 阻塞是指在执行设备操作时若不能获得资源则挂起进程直到满足可操作的条件后再进行操作。被挂起的进程进入睡眠状态，被从调度器的运行队列移走，直到条件满足，而非阻塞操作的进程在不能进行设备操作时并不挂起，它要不就放弃要不就不停的查询，直到可以进行操作为止。
+	进程睡眠之后，需要确保在某个地方唤醒，不然就永远醒不来了，而最大的可能是在中断里唤醒，因为在硬件资源获得的同时往往伴随着一个中断。
+	进程睡眠之后，需要确保在某个地方唤醒，不然就永远醒不来了，而最大的可能是在中断里唤醒，因为在硬件资源获得的同时往往伴随着一个中断。
+	在打开文件时可以指定是否已阻塞的方式打开，还可以通过ioctl()和fcntl()的方式改变读写的方式。
+	2、等待队列
+	在驱动程序中使用wait queue来实现阻塞进程的唤醒，1)定义等待队列头部 wait_queue_head_t my_queue 2)初始化头部 init_waitqueue_head()    3)定义等待队列元素 DECLARE_WATIQUEUE(name,tsk) 4)添加/移除等待队列 add_wait_queue()/remove_wait_queue() 5).等待事件wait_event()/wait_event_interruptible()/wait_event_timeout()/wait_event_interruptible_timeout() 6).唤醒队列 wake_up()/wake_up_interruptible()
+	wake_up可以唤醒TASK_INTERRUPTIBLE和TASK_UNINTERRUPTIBLE的进程，而wake_up_interruptible()只能唤醒TASK_INTERRUPTIBLE的进程
+	【注意：当多个等待队列、信号量、互斥体等机制同时出现时，谨防死锁】
+	3、轮询操作
+	当多路复用的文件数量庞大、IO流量频繁的时候，一般不太适合使用select()和poll()，此种情况下，使用epoll，epoll不会随着fd的数目增长而降低效率，select则会随着fd的数量增多性能下降明显
+	设备驱动中的轮询编程：
+--------------------------【key: 驱动开发】-第九章-------------------------------------------------------------------------------------------------------------------------------
+20180124：【linux设备驱动中的异步通知和异步I/O 】
+异步通知机制由驱动主动通知应用程序。一旦设备就绪就主动通知应用，不需要查询设备状态
+异步IO：应用发起IO请求后立即返回，之后再查询IO完成情况，或者IO完成后被调回。
+	@linux异步通知编程：使用信号来实现
+	SIGHUP-挂起  SIGINT-终端中断 SIGQUIT-终端退出 SIGILL-无效命令 等等
+	进程捕获一个信号后有相应的代码处理，否则内核将采用默认行为处理。
+	【信号的接收】可以使用signal()函数处理对应信号的处理函数,如果signal()调用成功，返回最后一次为信号signum绑定的处理函数的handler值，失败则返回SIG_ERR。
+	sigaction()函数可以改变进程接收到特定信号后的行为。
+	【信号的释放】为使得设备支持异步通知机制，驱动程序中涉及3项工作：
+	1、支持F_SETOWN命令，能在这个控制命令处理中处置filp->f_owner为对应的进程ID，内核已经完成，驱动无需处理
+	2、支持F_SETFL命令的处理，每当FASYNC标志改变时，驱动中的fasync()函数将得以执行，因此驱动中要实现fasync()函数 
+	3、在资源获得时，调用kill_fasync()函数激发相应的信号。
+	所以在驱动中异步通知编程比较简单，主要用到一项数据结构和两个函数：
+	fasync_struct结构体和 fasync_helper函数处理FASYNC标志变更、kill_fasync函数释放信号
+
+	@linux异步I/O
+	注意：异步的操作返回状态要调用函数来获得，不像同步IO是等待操作函数的返回值。
+	aio_read()/aio_write()/aio_error()/aio_return()
+第十章 中断与时钟
+	@顶半部（紧急硬件操作）和底半部机制（延时的耗时操作）
+	@中断来源：内部中断-cpu指令、溢出、除法错误等，外部中断-外设提出的中断请求。
+	@向量中断和非向量中断：向量中断分配不同中断号，自动跳转到与该中断号对应的地址执行；非向量中断共享一个入口地址。
+	@linux中断编程
+		申请中断->释放中断
+	@使能/屏蔽中断
+		disable_irq()/disable_irq_nosync()/enable_irq()/local_irq_save()/local_irq_disable()
+	@底半部机制：tasklet、工作队列、软中断、线程化irq
+		1、tasklet  -执行上下文是软中断 只需要定义tasklet及其处理函数，并且关联两者即可。
+		在顶半部中断处理函数后面调度就行tasklet_schedule()。
+		2、工作队列  -执行上下文是内核线程，可以睡眠和调度
+		3、软中断 -也是一种底半部处理机制
+			open_softirq()注册软中断相应处理函数
+			raise_softirq()触发一个软中断
+		软中断和tasklet运行与软中断上下文，仍然属于原子上下文的一种，而工作队列运行在进程上下文，因此，软中断和tasklet处理函数中不允许睡眠，工作队列允许。
+		local_bh_disable/local_bh_enable()是内核禁止和使能软中断及tasklet底半部机制的函数
+		【内核采用softirq的地方：HI_SOFTIRQ,TIMER_SOFTIRQ,NET_TX_SOFTIRQ,NET_RX_SOFTIRQ,SCSI_SOFTIRQ,TASKLET_SOFTIRQ】
+		【总结】硬中断：外部设备对cpu的中断
+		软中断：中断底半部的一种处理机制
+		信号：内核或进程对某个进程的中断
+	@中断共享
+	@内核定时器
+	时钟中断处理程序会唤起TIMER_SOFTIRQ软中断，运行当前处理器上到期的所有定时器。
+	@内核定时器编程
+		1、timer_list结构体的一个实例对应一个定时器
+		2、初始化定时器 init_timer(struct timer_list * timer);
+		3、增加定时器 add_timer 注册内核定时器，将定时器加入到内核动态定时器链表中
+		4、删除定时器 del_timer del_timer_sync是del_timer的同步版，在删除一个定时器时需要等待其被处理完，因此该函数的调用不能发生在中断上下文中。
+		5、修改定时器的expire
+		mod_timer 修改定时器的到期时间
+		
+	@内核中的延迟的工作delayed_work  -本质还是利用工作队列和定时器实现
+	delayed_work结构体
+	schedule_delayed_work，当指定的delay到来时，delayed_work结构体中的work成员work_func_t类型成员func()会被执行。
+--------------------------【key: 驱动开发】-第十章 中断和时钟-------------------------------------------------------------------------------------------------------------------------------
+20180125：
+用户空间的策略：打开文件，关闭文件，定位文件，监控状态，读文件，写文件，调度进程，睡眠，错误判定，等
+内核空间提供的机制：打开设备，关闭设备，注册设备，注册驱动，中断处理函数，软中断，工作队列，匹配
