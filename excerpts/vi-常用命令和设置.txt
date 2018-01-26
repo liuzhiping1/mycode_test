@@ -1,4 +1,4 @@
-:vsplit 垂直分屏
+﻿:vsplit 垂直分屏
 set hlsearch
 set number
 " 自动缩进
@@ -18,3 +18,13 @@ set autowrite
 "set ruler           " 显示标尺 
 set showcmd         " 输入的命令显示出来，看的清楚些
  set cursorline
+
+:vertical diffsplit FILE_RIGHT 比较
+或者 
+# vim -d  FILE_LEFT  FILE_RIGHT
+1. Ctrl-w K（把当前窗口移到最上边）
+2.	Ctrl-w H（把当前窗口移到最左边）
+3.	Ctrl-w J（把当前窗口移到最下边）
+4.	Ctrl-w L（把当前窗口移到最右边）
+:set noscrollbind 光标移动
+https://www.cnblogs.com/MuyouSome/archive/2013/04/28/3049661.html

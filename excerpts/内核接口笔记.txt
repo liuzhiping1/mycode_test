@@ -1,3 +1,4 @@
+ 需要完善这些接口的参数和用法
  static inline int signal_pending(struct task_struct *p) 判断进程p是否是信号唤醒
  schedule()调度进程
  __set_current_state()切换进程状态
@@ -40,4 +41,29 @@
  del_timer()移除定时器
  atomic_read()原子读
  put_user()复制到用户空间
- 
+ ndelay()/udelay()/mdelay() 内核延时 在内核中最好不要直接使用mdelay函数，这将耗费cpu资源
+ msleep()
+ time_before(jiffies,delay)/time_after(jiffies,delay)  长延时
+ schedule_timeout() 睡着延迟
+ 【内存与IO访问】
+ virt_to_phys()、phys_to_virt() 虚拟和物理内存的转换，仅适用于DMA和常规区域，高端内存没这么简单的换算关系
+ malloc()/free()用户空间的动态内存申请和释放
+ kmalloc()和__get_free_pages()申请的内存位于DMA和常规区域的映射区，而且物理上也是连续的，他们与真实的物理地址只有一个固定的偏移
+ vmalloc()在虚拟内存空间是连续的，但是物理山不一定
+ ioremap()映射
+ iounmap()解映射
+ inb()读字节端口
+ outb()写字节端口
+ inw()读字端口
+ outw()写字端口
+ readb_relaxed()、readw_relaxed()。。。 读寄存器api 没有内存屏障
+ readb()、readw()。。。读寄存器api 有内存屏障
+ request_region(unsigned long first, unsigned long n,const char *name)向内核申请n个IO端口
+ release_region()释放IO端口
+ request_mem_region(unsigned long start, unsigned long len,char *name)向内核申请n个IO内存地址
+ release_mem_region()释放IO内存
+ int (*mmap) (struct file *, struct vm_area_struct *);这个是file_opreation结构体中的mmap函数指针，它在用户进行mmap()系统调用时最终被调用
+ 【spi】
+ struct spi_master *spi_alloc_master()
+ int spi_register_master()
+ void spi_unregister()
