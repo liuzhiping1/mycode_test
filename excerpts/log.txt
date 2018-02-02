@@ -1132,3 +1132,7 @@ linux中通常通过文件系统访问磁盘，但是也有原始访问方式如
 tm1723的按键增加组合按键功能。
 -----------------------------------------------------------------------------------------------------------------------------
 20180202:
+【makefile的subst函数】$(subst FROM, TO, TEXT)，即将字符串TEXT中的子串FROM变为TO。
+https://lwn.net/Articles/496400/  【Supporting multi-platform ARM kernels】
+http://blog.csdn.net/mrwangwang/article/details/35997153/ 【Linux内核之mmc子系统-sdio】这个讲的还挺好
+++增加74hc595的驱动，IO口的配置在bank1，需要转换bank，在INSCON寄存器中配置。

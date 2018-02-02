@@ -1,1 +1,10 @@
++
 linux块设备驱动分析
++ IO调度，缓冲，请求队列，
++ 随机访问，有对应缓冲区，块为单位接收输入输出
++ 块设备驱动结构体：block_device_operations  他是块设备操作的集合
++ 通用磁盘结构体：gendisk  表示独立的磁盘设备
++ 上层传递给块层的IO请求结构体：bio 
++ 请求队列结构体：request_queue 
++ 块设备的初始化：register_blkdev()/blk_init_queue()/add_disk()
+++ 初始化过程： 分配和初始化请求队列，绑定请求队列和请求处理函数，可能分配和初始化gendisk并赋值成员，添加gendisk。
