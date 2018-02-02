@@ -1,1 +1,104 @@
++
 linux网络设备驱动分析和相关接口
+++
+4个层次： 网络设备驱动向上提供数据包的收发接口能力，向下驱动网络设备硬件
+--------网络协议接口层-------
+向上层提供统一的数据包接收发送接口，不论是arp协议还是ip协议，都通过【dev_queue_xmit()】函数发送数据，通过【netif_rx】函数接收数据。
+--------网络设备接口层-------
+【net_device】：该结构向上一层协议接口层提供统一的描述具体网络设备属性和操作。这个结构就是本层的核心，集合了对设备的各种操作函数
+--------设备驱动功能层-------
+本层的各函数就是设备接口层的核心结构体【net_device】的各函数的具体成员，是驱使网络设备硬件完成相应动作的程序，它通过【hard_start_xmit()】函数启动发送操作，并
+通过网络设备上的【中断】触发接收操作
+--------网络设备与媒介层-----
++
+完成数据包的发送和接收的物理实体，
+|-------------------------------------------------------------|
+|  如下：                                                     |
+|  |-------------------------------|                          |
+|  |数据包发送           数据包接收|                          |
+|  |dev_queue_xmit       netif_rx  |   <--网络协议接口层      |
+|  |    |                    |     |                          |
+|  |----|--------------------|-----|                          |
+|  |    v                    ^     |                          |
+|  |  --------------------------   |                          |
+|  | |  结构体net_device        |  |   <--网络设备接口层      |
+|  |  --------------------------   |                          |
+|  |----|--------------------|-----|                          |
+|  |	v                    ^     |                          |
+|  |数据包发送          数据包接收 |   <--网络驱动功能层      |
+|  |hard_start_xmit      中断处理  |                          |
+|  |----|--------------------|-----|                          |
+|  |    v                    ^     |                          |
+|  |  --------------------------   |                          |
+|  | |  网络物理设备媒介        |  |   <--网络设备与媒介层    |
+|  |  --------------------------   |                          |
+|  |-------------------------------|                          |
+|                                                             |
+|-------------------------------------------------------------|
+在设计网络设备驱动的主要工作就是编写功能层的函数以填充net_device，并将之注册进内核。
++ sk_buff
+sk_buff结构体就是在发送和接收数据包的缓冲区，称为套接字缓冲区。
+++ 下面分析涉及套接字缓冲区的操作函数：
+	+++ 分配
+	struct sk_buff *alloc_skb(unsigned int len, gfp_t priority);
+	struct sk_buff *dev_alloc_skb(unsigned int len);
+	+++ 释放
+	void kfree_skb(struct sk_buff *skb);
+	void dev_kfree_skb(struct sk_buff *skb); 用在非中断上下文
+	void dev_kfree_skb_irq(struct sk_buff *skb); 用在中断上下文
+	void dev_kfree_skb_any(struct sk_buff *skb);	皆可以 
+    +++ 变更
+	unsigned char *skb_put(struct sk_buff *skb, unsigned int len); 在缓冲区尾部增加数据
+	unsigned char *skb_push(struct sk_buff *skb, unsigned int len); 在缓冲区头部增加数据
+	unsigned char *skb_pull(struct sk_buff *skb, unsigned int len); 在缓冲区头部移除数据
+	static inline void skb_reserve(struct sk_buff *skb, int len);调整缓冲区的头部
++ 网络设备驱动的注册和注销
+++ register_netdev()/unregister_netdev() 注册和注销
+++ alloc_netdev()/alloc_etherdev()/alloc_etherdev_mq() 分配net_device并赋值成员
+++ free_netdev() 释放net_device
+
++ 网络设备的初始化
+++ 1、检测网络设备是否存在，存在就检测设备的硬件资源 ; 2、软件接口上的准备工作，分配net_device结构体并赋值成员; 3、获得设备的私有信息指针并初始化成员的值，如果包括自旋锁，信号量等同步并发机制，也要初始化.
+++ 初始化模板
++++  void xxx_init(struct net_device *dev)
+	{
+		/*设备私有数据结构体*/
+		/*检测设备是否存在和设备所使用的硬件资源*/
+		/*初始化以太网设备的公用成员*/
+		/*设置设备的成员函数指针*/
+		/*获得私有信息，并初始化它*/
+		/*初始化设备私有数据*/
+	}
++ 网络设备的打开和释放
+++ 1、使能设备的硬件资源，如申请IO区域、中断和DMA通道等; 2、调用linux内核接口netif_start[stop]_queue()，激活/关闭设备发送队列； 3、释放设备所使用的IO区域、中断和DMA资源。
+++ 模板
++++ 
+static int xxx_open(struct net_device *dev)
+{
+	/*申请端口、irq等，类似fops->open*/
+	ret = request_irq(dev->irq,&xxx_interrupt,0,dev->name,dev);
+	...
+	netif_start_queue(dev);
+	...
+}
+static int xxx_release(struct net_device *dev)
+{
+	/*释放端口、irq等，类似fops->release*/
+	free_irq(dev->irq,dev);
+	...
+	netif_stop_queue(dev);
+	...
+}
++ 数据发送流程
+++ 1、将从上层协议传递过来的sk_buff获得有效数据和长度，将有效数据放入临时缓冲区; 2、对于以太网，如果有效数据的长度小于以太网冲突检测所要求的数据帧的最小长度ETH_ZLEN,则给临时缓冲区的末尾填0; 3、设置硬件寄存器，驱使网络设备进行数据的发送操作
++ DM9000实例--/opt/linux-4.1.38/drivers/net/ethernet/davicom/dm9000.c
+	-- module_platform_driver(dm9000_driver);
+     --- dm9000_probe()/struct dm9000_drv_pm_ops/dm9000_of_matches[]/dm9000_drv_remove()
+	  ---- dm9000_drv_pm_ops::dm9000_drv_suspend()/dm9000_drv_resume()
+	  ---- dm9000_of_matches::.compatible = "davicom,dm9000"
+	  ---- dm9000_probe::&dm9000_netdev_ops/dm9000_ethtool_ops/dm9000_phy_read()/dm9000_phy_write()           //Search DM9000 board, allocate space and register it 这个是重点函数,这个函数将设备的一切功能展现出来，让设备融入到了内核，注册了irq，分配了资源，使之可以被用户使用，可以打开，关闭等操作，probe函数的作用相当于人力资源部把你的手续办好了，后续只管开始工作就行了。
+	  ---- dm9000_drv_remove:: unregister free device struct 
+	    ----- dm9000_drv_remove::dm9000_shutdown()/netif_device_detach()
+	    ----- dm9000_drv_resume::dm9000_init_dm9000()/dm9000_unmask_interrupts()/netif_device_attach()
+		----- dm9000_netdev_ops::dm9000_open()/dm9000_stop()/dm9000_start_xmit()/dm9000_timeout()/dm9000_hash_table()/dm9000_ioctl()/eth_change_mtu()/dm9000_set_features()/eth_validate_addr()/eth_mac_addr/dm9000_poll_controller()
+		------ 

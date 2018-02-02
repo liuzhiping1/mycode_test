@@ -90,3 +90,9 @@ ctags -R 生成tags文件
 vim command- :set tags=/path/tags 设置当前tag文件，“Ctrl + ]” 定位定义的地方，“Ctrl + o/t ”组合快捷键返回，【重要：gd组合键-对光标所在处的word进行快捷查找定位】
 pstree 进程树
 type 这个命令很有意思，显示一个命令类型描述。
+
+fg 恢复ctrl+z
+　　(1) CTRL+Z挂起进程并放入后台
+　　(2) jobs 显示当前暂停的进程
+　　(3) bg %N 使第N个任务在后台运行(%前有空格)
+　　(4) fg %N 使第N个任务在前台运行
