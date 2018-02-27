@@ -1,0 +1,18 @@
+http://blog.csdn.net/zqixiao_09/article/details/51105877 linux下的sdio接口的wifi驱动
+
++ sdio接口
+
++ sdio总线 
+++ host <--> device
+++ 时钟线、命令线、数据线、VDD/VSS1、VSS2
++ 热插拔原理
+++ 定时器检测或者插拔中断检测
++ sdio命令
+++ 命令、响应、数据
++ sdio接口驱动
+++ 驱动是sdio驱动，设备是WIFI设备
+++  设备层（wifi设备） <--> 核心层 <--> 主机驱动层（sdio驱动）
+++ 和驱动相关的数据结构：mmc_host-主机控制器，mmc_card-卡，mmc_driver-卡驱动，sdio_func-功能设备，mmc_host_ops-控制器接口函数集
+
++ wifi驱动部分=【host主机驱动】+【固件firmware】
+++ 固件firmware：天线接收和发送的是802.11帧，但是主机接收和发送的是802.3帧，所以固件负责转换，当天线接收到数据，固件处理放在一个buffer后出发一次中断，主机接收中断后读取buffer
