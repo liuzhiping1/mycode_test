@@ -1,0 +1,26 @@
+重要学习网址：查看英文文档这个能力要有！！！
+https://elinux.org/Tims_Notes_on_ARM_memory_allocation   【Tims Notes on ARM memory allocation】
+http://tinylab.org/learning-rlk4.0-in-linux-lab/ 泰晓科技-嵌入式
+http://tinylab.org/  泰晓科技-聚焦嵌入式
+http://tinylab.org/elinux-org-boot-time-optimization/ 优化linux启动时间
+https://github.com/MintCN/linux-insides-zh linux-内核揭秘
+https://elinux.org/Main_Page  Embedded Linux Wiki  【这个网址非常厉害了】
+http://digilander.libero.it/robang/rubrica/serial.htm  《Serial Programming Guide for POSIX Operating Systems》
+http://blog.csdn.net/g1036583997/article/details/7906934 Linux 下串口USB等设备通信编程入门1
+http://spblinux.de/2.0/doc/busyboxdocumentation.html  BusyBox - The Swiss Army Knife of Embedded Linux 【busybox的用法】
+https://www.kernel.org/doc/gorman/html/understand/ 【这个也厉害了，学习理解linux的利器啊】
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0333h/Babbhigi.html 【arm的内存管理单元】
+https://www.ibm.com/developerworks/cn/linux/l-rcu/  Linux 2.6内核中新的锁机制--RCU
+http://www.cnblogs.com/mosp/p/3551006.html  深入理解linux网络技术内幕-通知链
+https://www.cnblogs.com/Caden-liu8888/p/7725293.html EXPORT_SYMBOL使用 【使用EXPORT_SYMBOL可以将一个函数以符号的方式导出给其他模块使用】
+http://www.cnblogs.com/pengdonglin137/p/3603549.html   linux-2.6.26内核中ARM中断实现详解
+http://blog.sina.com.cn/s/blog_59b189220100au1k.html  gun-arm-汇编
+http://blog.csdn.net/liduxun/article/details/48119849  ARM Linux系统调用详细分析 【三个文件：arch/arm/kernel/sys_arm.c、arch/arm/include/asm/unistd.h、arch/arm/kernel/calls.S】
+http://www.cnblogs.com/pengdonglin137/p/3878316.html 浅析基于arm的linux系统调用的实现  ***
+https://www.cnblogs.com/wxb20/p/6249580.html arm 汇编
+https://lwn.net/Articles/496400/  【Supporting multi-platform ARM kernels】
+http://blog.csdn.net/mrwangwang/article/details/35997153/ 【Linux内核之mmc子系统-sdio】这个讲的还挺好
+https://elinux.org/Memory_Management#Huge.2Flarge.2Fsuperpages 【linux内核-内存管理】
+https://lwn.net/  linux社区
+https://elinux.org/Device_drivers 【linux设备驱动】elinux上的设备驱动程序样例集合。
+https://elixir.bootlin.com/linux/v4.15.9/source/drivers/usb/usb-skeleton.c 【这个牛逼了，有linux，busybox，u-boot的各版本的源代码】

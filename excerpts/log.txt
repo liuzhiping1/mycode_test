@@ -6,6 +6,8 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 项目产品：安防产品、智能家居、网络设备、视频雷达等
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
+关键字：linux、C、汇编、内核、应用、驱动、子系统、模块、版本管理、文件系统、设备、命令行、编译、代码阅读（SI/ctag+vim）
+----------------------------------------------------------------------------------------------------------------------------------------------------------
 参考书籍：
     C Primer Plus(第五版)中文版.pdf
 	深入Linux内核架构-郭旭 -译.pdf
@@ -20,6 +22,8 @@
     USB 2.0规范中文版.pdf
 	算法导论
 	深入linux内核系列章节
+	《Understanding Linux Network Internals》-pdf
+	《linux device drivers》-O'reilly -pdf
     等等
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 文件资料：见百度网盘（qq登入），github，华为云-DevCloud,微云
@@ -1145,3 +1149,90 @@ Drivers/net/wireless/libertas/if_sdio.c
 20180226：深入理解linux内核-第十三章
 IO体系结构和设备驱动模型，这些章节要熟记，多看几遍了然于胸。
 用户态的udev工具集应用程序，在系统启动的时候根据配置文件创建/dev的设备文件
+------------------------------------------------------------------------------------------------------------------------------
+20180227：深入理解linux内核-第十章 系统调用
+系统调用和应用编程接口：前者是通过软中断向内核发出一个明确的请求，后者只是一个函数定义，说明了如何获得一个给定的服务。
+POSIX标准针对API而不是系统调用。
+系统调用属于内核，用户态的库函数不属于内核。
+普通C函数的参数传递是通过把参数值写入活动的程序栈（用户态或内核态栈）实现的。
+系统调用在发出系统调用之前把参数写入cpu寄存器中，然后在调用系统服务例程之前，内核再把cpu中的参数拷贝到内核态栈中。
+寄存器的使用使得系统调用处理程序的结构和其他的异常处理程序的结构类似。
+进入系统调用：x86是int 0x80，arm的是swi 系统进入内核态，并执行内核函数	system_call()
+【主要学习arm-linux】
+http://blog.csdn.net/liduxun/article/details/48119849  ARM Linux系统调用详细分析 【三个文件：arch/arm/kernel/sys_arm.c、arch/arm/include/asm/unistd.h、arch/arm/kernel/calls.S】
+http://www.cnblogs.com/pengdonglin137/p/3878316.html 浅析基于arm的linux系统调用的实现  ***
+https://www.cnblogs.com/wxb20/p/6249580.html arm 汇编
+【函数定义前加宏asmlinkage ,表示这些函数通过堆栈而不是通过寄存器传递参数。】
+gcc编译器在汇编过程中调用c语言函数时传递参数有两种方法：一种是通过堆栈，另一种是通过寄存器。缺省时采用寄存器，假如你要在你的汇编过程中调用c语言函数，并且想通过堆栈传递参数，你定义的c函数时要在函数前加上宏asmlinkage
+http://www.cnblogs.com/pengdonglin137/p/3603549.html   linux-2.6.26内核中ARM中断实现详解
+http://blog.sina.com.cn/s/blog_59b189220100au1k.html  gun-arm-汇编
+
+-------------------------------------------------------------------------------------------------------------------------------
+20180228：
+gun-arm-汇编：一个汇编文件的程序缺省入口是start标号，也可以在连接脚本中用ENTRY标志指明其他入口。
+汇编中的宏:如果使用宏参数，那么在宏实体中使用参数的时候要添加前缀“\”。
+【git 忽略一些文件或文件夹-增加.gitignore文件或在info/exclude文件中加入要忽略文件的文件名或文件夹名即可】
+【openSuse 查看发行版本：cat /etc/os-release】
+《Understanding Linux Network Internals》
+《linux device drivers》
+《understanding the linux kernel and linux device driver》
+--------------------------------------------------------------------------------------------------------------------------------
+20180301：
+understanding linux network internals：总结：数据结构中的函数指针使得读代码有点小困难，所以关键在于找到该函数指针的初始化的地方
+https://www.ibm.com/developerworks/cn/linux/l-rcu/  Linux 2.6内核中新的锁机制--RCU
+http://www.cnblogs.com/mosp/p/3551006.html  深入理解linux网络技术内幕-通知链
+https://www.cnblogs.com/Caden-liu8888/p/7725293.html EXPORT_SYMBOL使用 【使用EXPORT_SYMBOL可以将一个函数以符号的方式导出给其他模块使用】
+摘录：
+【hardware interrupts】They are defined in kernel/irq/manage.c and are
+overridden by architecture-specific functions in arch/XXX/kernel/irq.c, where XXX is the
+architecture-specific directory。When the kernel receives an interrupt notification, it uses the IRQ number to find
+out the driver’s handler and then executes this handler.
+【Interrupt types】With an interrupt, an NIC can tell its driver several different things. Among them
+are:1、Reception of a frame 2、Transmission failure 3、DMA transfer has completed successfully 4、Device has enough memory to handle a new transmission
+-----------------------------------------------------------------------------------------------------------------------------------
+20180302：《linux device driver》
+PCI驱动：
+usb驱动：
+http://digilander.libero.it/robang/rubrica/serial.htm  《Serial Programming Guide for POSIX Operating Systems》
+http://blog.csdn.net/g1036583997/article/details/7906934 Linux 下串口USB等设备通信编程入门1
+
+-----------------------------------------------------------------------------------------------------------------------------------
+ ...  这段时间老婆住院，请假陪她。
+-----------------------------------------------------------------------------------------------------------------------------------
+20180312：
+http://tinylab.org/learning-rlk4.0-in-linux-lab/ 泰晓科技-嵌入式
+http://tinylab.org/  泰晓科技-聚焦嵌入式
+http://tinylab.org/elinux-org-boot-time-optimization/ 优化linux启动时间
+https://github.com/MintCN/linux-insides-zh linux-内核揭秘
+https://elinux.org/Main_Page  Embedded Linux Wiki  【这个网址非常厉害了】
+这样学习linux的速度可是太慢了，没有进步，每天瞎看又记不住，没有实用性。好好反思一下，首先讲究学习的效率，怎样才能提高吸收的力度很重要，关看源码不行，光看书也不行，光看文章也不行，光看不思考不消化，也不行，所以要综合，既要看源码、书籍、文章，同时也要暂停下来思考。这个是理论层面，还要实践，我的目标是灵活并熟练的使用linux。笼统的概括一下：阶段一：了解linux包括其逻辑思想 。阶段二：掌握linux的一个子系统，同时掌握类比方法能够很好的去掌握其他子系统。 阶段三：掌握多个子系统，能够熟练开发。我当前还是处于阶段一多一点，但是有没有达到阶段二。
+我的注意力有点不那么集中，同时又容易摇摆，这是个问题。【提高记忆力，改进学习方法】
+http://spblinux.de/2.0/doc/busyboxdocumentation.html  BusyBox - The Swiss Army Knife of Embedded Linux 【busybox的用法】
+------------------------------------------------------------------------------------------------------------------------------------
+20180314：
+https://elinux.org/Tims_Notes_on_ARM_memory_allocation   【Tims Notes on ARM memory allocation】
+A call tree for a regular page table setup is:
+ start_kernel()
+   setup_arch()
+     paging_init()
+       map_lowmem()
+         create_mapping()
+           alloc_init_pud() - for a range of pgd entries
+             alloc_init_section() - for a range of "pud" entries
+               *pmd = __pmd(<stuff>) - actually set the pmd/pgd entries for a SECTION mapping
+               or
+               alloc_init_pte()
+                 early_pte_alloc() - to get a page for the pte table
+                   pte_offset_kernel() - get address of 'linux' portion of pte table page
+                 set_pte_ext(<stuff>) - create the individual PTE entries, for a range of entries
+               =>  cpu_set_pte_ext() - macro to wrapper calling through a cpu-specific routine
+               =>  processor.set_pte_ext() - function pointer to cpu-specific routine
+               =>  cpu_armXXX_set_pte_ext() or cpu_procvX_set_pte_ext - cpu-specific-routine
+https://www.kernel.org/doc/gorman/html/understand/ 【这个也厉害了，学习理解linux的利器啊】
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0333h/Babbhigi.html 【arm的内存管理单元】
+https://www.cnblogs.com/yjf512/p/3298582.html 【linux中的cgroup-controller group】-Cgroup是将任意进程进行分组化管理的Linux内核功能 ，cgroup本身提供将进程进行分组化管理的功能和接口的基础结构
+
+http://tinylab.org/lwn-577961-btrfs-working-with-multiple-devices/ 【Btrfs 同多设备协作，多设备功能是 Btrfs 早期设计目标之一】
+http://tinylab.org/lwn-577218-btrfs-getting-started/ 【Btrfs 入门】
+https://elinux.org/Device_Tree_Usage#Basic_Data_Format 【设备树的用法】
+https://www.cnblogs.com/xiaojiang1025/p/6131381.html 【设备树语法详解】

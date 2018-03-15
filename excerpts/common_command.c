@@ -96,3 +96,10 @@ fg 恢复ctrl+z
 　　(2) jobs 显示当前暂停的进程
 　　(3) bg %N 使第N个任务在后台运行(%前有空格)
 　　(4) fg %N 使第N个任务在前台运行
+tty 查看当前shell的终端
+kmod --help
+lspci
+lsusb
+nice -n xx ./a.out 指定优先级运行进程
+btrfs -control a btrfs filesystem
+strings - print the strings of printable characters in files.
