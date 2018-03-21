@@ -103,3 +103,48 @@ lsusb
 nice -n xx ./a.out 指定优先级运行进程
 btrfs -control a btrfs filesystem
 strings - print the strings of printable characters in files.
+iwconfig //查看无线网卡信息
+id -u 
+dmidecode  - DMI table decoder (some say SMBIOS) 查看计算机的BIOS信息
+-----------------------------------------------------------------
+----------------linux performance tools--------------------------
+applications：       
+	app config ...
+system libraries: 
+	ldd,gethostlatency
+system call interface : 
+	strace
+VFS: lsof,pcstat
+File systems: df -h,btrfs,ext4disk...
+volume Manager: dmsetup,mdflush
+block device int. : pidstat -d
+sockets: ss
+TCP/UDP: tcptop,tcplife,tcpaccept ...
+IP: ip,route,iptables,netstat ...
+Ethernet: tcpdump
+Scheduler: schedtool ...
+Virtual Memory:top,htop,ps,pidstat,vmstat,slabtop,free,/proc/meminfo ...
+Clock Source: /sys/...
+Device Drivers: dmesg,multipath
+Firmware:
+
+I/O Bridge: tiptop
+I/O Controller: iotop,iostat,blktrace
+Disk: iotop,iostat,blktrace,lsblk
+Swap: swapon,swapoff
+
+Network Controller: ip.netstat
+Port: ethtool,ifconfig,snmpget,lldptool,netstat,ip,micstat
+
+GPU:
+CPU: 
+DRAM: numastat
+FAN:
+Power Supply: dmidecode
+ 
+interface: lspci lsusb
+---------------------end-----------------------------------------
+fdformat - low-level format a floppy disk 
+superformat
+mke2fs 
+mount -t ext3  -o data=wirte_back /dev/sda2 /mnt

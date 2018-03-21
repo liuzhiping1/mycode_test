@@ -24,3 +24,5 @@ https://elinux.org/Memory_Management#Huge.2Flarge.2Fsuperpages 【linux内核-�
 https://lwn.net/  linux社区
 https://elinux.org/Device_drivers 【linux设备驱动】elinux上的设备驱动程序样例集合。
 https://elixir.bootlin.com/linux/v4.15.9/source/drivers/usb/usb-skeleton.c 【这个牛逼了，有linux，busybox，u-boot的各版本的源代码】
+https://www.cnblogs.com/dakewei/p/7499014.html linux内核启动参数解析
+http://blog.csdn.net/blueman2012/article/details/6693605 伯克利套接字（BSD socket）

@@ -1,6 +1,6 @@
 刘志平-542431620@qq.com/15013523662
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
-技术标签：linux 、 C 、驱动开发、应用开发、网络、USB等总线、Python、shell、makefile、gcc等开发调试工具、单片机原理（外设、中断、内存、定时器、uart、usb等，用过各类单片机-51内核、pic内核、arm内核）、git、wifi、bluetooth、硬件
+技术标签：linux 、 C 、xml、json、驱动开发、应用开发、网络、USB等总线、Python、shell、makefile、gcc等开发调试工具、单片机原理（外设、中断、内存、定时器、uart、usb等，用过各类单片机-51内核、pic内核、arm内核）、git、wifi、bluetooth、硬件
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
 个人标签：精通C语言开发、精通linux应用驱动开发、 精通嵌入式单片机开发、精通数据库开发、精通视频处理（海思hi3516的sdk）、精通PIC和51汇编开发、精通使用各外设开发、熟练使用各通信协议、熟练使用版本管理git
 ----------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -1234,5 +1234,51 @@ https://www.cnblogs.com/yjf512/p/3298582.html 【linux中的cgroup-controller gr
 
 http://tinylab.org/lwn-577961-btrfs-working-with-multiple-devices/ 【Btrfs 同多设备协作，多设备功能是 Btrfs 早期设计目标之一】
 http://tinylab.org/lwn-577218-btrfs-getting-started/ 【Btrfs 入门】
-https://elinux.org/Device_Tree_Usage#Basic_Data_Format 【设备树的用法】
+https://elinux.org/Device_Tree_Usage#Basic_Data_Format 【设备树的用法，这个更专业，英文的】
 https://www.cnblogs.com/xiaojiang1025/p/6131381.html 【设备树语法详解】
+在这种趋势下，内核中原本的中断源直接到中断号的方式已经很难继续发展了，为了解决这些问题，linux kernel的大牛们就创造了irq domain(中断域)这个概念。domain在内核中有很多，除了irqdomain，还有power domain，clock domain等等，所谓domain，就是领域，范围的意思，也就是说，任何的定义出了这个范围就没有意义了。如上所述，系统中所有的interrupt controller会形成树状结构，对于每个interrupt controller都可以连接若干个外设的中断请求（interrupt source，中断源），interrupt controller会对连接其上的interrupt source（根据其在Interrupt controller中物理特性）进行编号（也就是HW interrupt ID了）。有了irq domain这个概念之后，这个编号仅仅限制在本interrupt controller范围内，有了这样的设计，CPU(Linux 内核)就可以根据级联的规则一级一级的找到想要访问的中断。当然，通常我们关心的只是内核中的中断号，具体这个中断号是怎么找到相应的中断源的，我们作为程序员往往不需要关心，除了在写设备树的时候，设备树就是要描述嵌入式软件开发中涉及的所有硬件信息，所以，设备树就需要准确的描述硬件上处理中断的这种树状结构，如此，就有了我们的interrupt-parant这样的概念：用来连接这样的树状结构的上下级，用于表示这个中断归属于哪个interrupt controller，比如，一个接在GPIO上的按键，它的组织形式就是：
+中断源--interrupt parent-->GPIO--interrupt parent-->GIC1--interrupt parent-->GIC2--...-->CPU
+---------------------------------------------------------------------------------------------------------------------------------------
+20180315：编译一个天嵌的嵌入式内核
+1、配置
+	配置Kconfig的过程就是对该文件中的各符号变量进行定义，他们分别在Makefile或其他脚本中会用到，这个可以通过搜索找到，也可以直接在menuconfig中按【？】键会直接跳出详细提示。【这个提示很详细，还是提示去参考Documentation中的哪个文档】
+/proc/config.gz 保存当前系统的.config，用gzip -cd /proc/config.gz > log。
+https://www.cnblogs.com/dakewei/p/7499014.html linux内核启动参数解析
+http://blog.csdn.net/blueman2012/article/details/6693605 伯克利套接字（BSD socket）
+【不可否认，百度翻译很好用】
+---------------------------------------------------------------------------------------------------------------------------------------
+20180316：
+《linux device drivers》if the code enters an endless loop, the kernel stops scheduling,* and the system doesn’t
+respond to any action, including the magic Ctrl-Alt-Del combination. You have two
+choices for dealing with system hangs—either prevent them beforehand or be able to
+debug them after the fact.
+https://www.vpsee.com/2011/01/how-to-detect-if-a-linux-system-running-on-a-virtual-machine/ 判断linux是否运行在虚拟机上
+---------------------------------------------------------------------------------------------------------------------------------------
+20180320:
+	内核文件系统ext3；
+	USB规范2.0中文版：
+		usb四种传输事务：控制，中断，批量、同步
+		usb客户端软件层--usb系统软件层--usb主机控制层--usb设备（驱动）
+		usb采用小端字节顺序，
+		usb数据包格式，PID表征数据包的类型：令牌Token、数据Data、握手Handshake、特殊包。
+		握手包包括：ACK肯定、NAK否定、STALL功能错误、NYET尚未准备要等待
+		其中，包是usb总线的数据传输的最小单元，不能被打断，否则会引发错误。若干个数据包组成一个事务传输，一次事务传输也不能打断，属于一次事务传输的几个包必须连续，不能跨帧完成。一次传输由一次到多次事务传输构成，可以跨帧完成。
+		usb的请求包括：标准请求11个、类请求、厂商请求
+------------------------------------------------------------------------------------------------------------------------------------------
+20180321：
+	结合《usb2.0 specification》、《linux device driver》、linux源码3.4版本（代码和文档Documentation） 学习linux的usb协议驱动。
+【The typical lifecycle of a urb is as follows:】
+• Created by a USB device driver.
+• Assigned to a specific endpoint of a specific USB device.
+• Submitted to the USB core, by the USB device driver.
+• Submitted to the specific USB host controller driver for the specified device by
+the USB core.
+• Processed by the USB host controller driver that makes a USB transfer to the
+device.
+• When the urb is completed, the USB host controller driver notifies the USB
+device driver.
+
+【Writing a USB Driver】
+The approach to writing a USB device driver is similar to a pci_driver: the driver registers
+its driver object with the USB subsystem and later uses vendor and device identifiers
+to tell if its hardware has been installed.
