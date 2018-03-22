@@ -1282,3 +1282,14 @@ device driver.
 The approach to writing a USB device driver is similar to a pci_driver: the driver registers
 its driver object with the USB subsystem and later uses vendor and device identifiers
 to tell if its hardware has been installed.
+---------------------------------------------------------------------------------------------------------------------------------------------
+20180322: 通过开源软件boa（嵌入式级http服务器）来学习开发进阶级linux的应用程序。
+僵尸进程：子进程结束了，但是父进程没有用wait/waitpid回收，也没有signal（SIGCHLD,SIG_IGN）通知内核说不关心子进程结束，最要命的是父进程还一直不是，所以该僵尸进程就一直占用进程号等资源。如果父进程死了那么就会有init进程回收，然后统一清理僵尸进程。
+【关于autoconf和automake：】使用qutomake，只需写一些简单的含有预定义宏的文件，由autoconf根据宏文件生成configure，由automake根据另一个宏文件生成Makefile.in，再使用configure依据Makefile.in来生成Makefile
+	source code --autoscan--> configure.scan --edit--> configure.in	
+	configure.in --aclocal--> aclocal.m4
+	Makefile.am + configure.in --automake-->Makefile.in
+	configure.in + aclocal.m4 --autoconf-->configure
+	Makefile.in + configure ---->Makefile [通过执行./configure]
+	
+	【明天继续学习boa的应用程序】
