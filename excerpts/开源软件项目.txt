@@ -1,0 +1,6 @@
+常用和研究用的开源软件：
+linux： linux内核源码树 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/ 
+git：分布式版本管理软件  https://github.com/liuzhiping1/git.git 
+boa：嵌入式http服务器  https://github.com/liuzhiping1/boa.git
+valgrind：检查内存错误 git clone http://git.videolan.org/git/x264.git
+ffmpeg：音视频采集、编解码、流化  https://git.ffmpeg.org/ffmpeg.git

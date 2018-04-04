@@ -1,0 +1,17 @@
+makefile调试
+1、使用info/warning/error增加调试信息 如
+方法1: $(info, "here add the debug info")
+           但是此不能打印出.mk的行号
+
+方法2: $(warning, "here add the debug info")
+
+方法3: $(error "error: this will stop the compile")
+     这个可以停止当前makefile的编译
+方法4: 打印变量的值
+      $(info, $(TARGET_DEVICE) )
+2、用命令echo 如@echo "start the compilexxxxxxxxxxxxxxxxxxxxxxx"
+
+3、选项
+--just-print（-n）make读进makefile并且输出它更新工作目标时将会执行的命令，但是不会真的执行它们
+--print-database（-p）
+--warn-undefined-variables 这个选项会使得make 在未定义的变量被扩展时显示警告信息。因为未定义的变量会被扩展成空字符串，这常见于变量名称打错而且很长一段时间未被发现到。这个选项有个问题，这也是为什么我很少使用这个选项的原因
