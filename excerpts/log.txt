@@ -1368,3 +1368,6 @@ linux网络调试：netstat，ping，lsof -i，tcpdump
 https://www.cnblogs.com/lidabo/p/4377545.html linux调试工具 
 valgrind： 检查内存错误
  https://www.cnblogs.com/wangkangluo1/archive/2011/07/20/2111248.html valgrind的使用方法
+ 增加对于linux系统编程的学习笔记-记录各章节的系统调用和C库函数
+ 
+ https://blog.csdn.net/u012063773/article/details/73846343 python解析execl表格的数据

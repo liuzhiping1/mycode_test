@@ -149,3 +149,5 @@ fdformat - low-level format a floppy disk
 superformat
 mke2fs 
 mount -t ext3  -o data=wirte_back /dev/sda2 /mnt
+getfattr
+getfacl
