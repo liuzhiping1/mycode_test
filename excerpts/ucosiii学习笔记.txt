@@ -1,5 +1,19 @@
 ucos-III 学习笔记
 
+第二章：移植uc/os到stm32
+	官网下载st对应的版本
+	新建文件夹（不是一定的）：app（配置、钩子函数等）、BSP（bsp.c、bsp.h）、uC-CPU（cpu相关）、uC-LIB（库相关）、uCOS-III（uCOS-III）
+	新建工程文件
+	修改启动文件：start_stm32f429_439xx.s-{PendSV_Handler改为OS_CPU_PendSV_Handler，SysTick_Handler改为OS_CPU_SysTick_Handler（有两个地方：一个定义，一个声明外部）}
+	bsp.h头文件里面的内容改一下
+	app_cfg.h 更改优先级
+第三章：时钟节拍
+	是ucos操作系统的心脏，它不跳动系统就瘫痪了。时钟节拍是操作系统的时基，时间上的管理必须依赖时基。
+	OS_CFG_TICK_RATE_HZ 定义在os_cfg_app.h
+	OS_CPU_SysInit() 定义在os_cpu_c.c
+	OS_CPU_SysTickHandler (void) 定义在os_cpu_c.c
+	OSTimeTick (void) 定义在os_time.c
+	
 第四章： 时间管理
 	建立在时钟节拍上
 	1、OSTimeDly(OS_TICK dly, OS_OPT opt, OS_ERR *p_err)
@@ -73,11 +87,11 @@ ucos-III 学习笔记
 	OSTaskRegSet()
 	OSTaskRegGet()
 第十五章：中断管理
-	
+	中断任务相当于最高优先级的任务，中断一般处理比较急的事件，而且只做简单的事件，待退出中断后再详细处理，基于此，一般在中断中发信号量、消息等事件标志，等退出后再在相应的任务中详细处理
 	OSIntEnter()
 	OSIntExit()
-	CPU_IntDisMeasMaxGet()
-	CPU_IntDisMeasMaxCurReset()
+	CPU_IntDisMeasMaxGet() ：测量整个程序最大关中断时间
+	CPU_IntDisMeasMaxCurReset() ： 测量某程序段运行过程中的最大关中断时间
 	CPU_IntDisMeasMaxCurGet()
 	
 第十六章：统计信息

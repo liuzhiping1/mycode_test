@@ -1380,3 +1380,13 @@ valgrind： 检查内存错误
 	https://www.zhihu.com/question/23374078 详见链接
 	sscanf()-格式化输入，
 	int sscanf(const char *str, const char *format,  ...)从str字符串中格式化输入内容到指定变量内
+-----------------------------------------------------------------------------------------------------------------------------------------------
+20180416：
+	爱板网：http://www.eeboard.com/
+	1、MicroPython  http://www.eeboard.com/evaluation/micropythonboard/ 简单、方便、快速开发嵌入式实时系统——用MicroPython就对了
+		http://docs.micropython.org/en/latest/pyboard/reference/speed_python.html#designing-for-speed
+	2、玩树莓派 https://projects.raspberrypi.org/en/projects/cat-meme-generator
+	
+-----------------------------------------------------------------------------------------------------------------------------------------------
+20180419:
+	方向：树莓派、python、C++、视觉2D、工业自动化、机器学习
