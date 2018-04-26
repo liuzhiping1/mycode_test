@@ -1391,3 +1391,17 @@ valgrind： 检查内存错误
 20180419:
 	方向：树莓派、python、C++、视觉2D、工业自动化、机器视觉
 	技术点：OpenCV、C++、Matlab等视觉软件、python
+-----------------------------------------------------------------------------------------------------------------------------------------------
+20180424：
+	树莓派、C++、opencv
+	opencv：https://blog.csdn.net/column/details/opencv-manual.html?&page=3 学习笔记
+	https://www.cnblogs.com/linshuhe/p/5764394.html  OpenCV学习笔记（一）——OpenCV3.1.0+VS2015开发环境配置
+
+【我要达到一个目标：嵌入式相关的基本流程能够掌握，了如指掌，如系统移植，系统引导等相关知识，linux，配置选型，网络设置，等等，从会使用到掌握会更改代码，C/C++语言工具要精通使用，善于使用，上升到业务代码也要能够分析原理解释定位问题，开发需求。工作和个人项目也要有，必须要做好工作。思考一下我的技能布局和能力模型。检验技术的标准就是能够很好的利用计算机完成某种业务需求。准备花一生的精力在信息技术上。这也是我的兴趣爱好和事业。不是记性差而是没用心。没有上心吧！！】
+
+https://blog.csdn.net/gatieme/article/details/50939155 C++智能指针auto_ptr详解
+
+树莓派论坛：https://linux.cn/tech/raspberrypi/
+http://www.shumeipai.net/thread-19043-1-1.html 树莓派配置文件说明
+https://linux.cn/article-8605-1.html  如何用树莓派控制 GPIO 引脚并操作继电器
+http://shumeipai.nxez.com/2016/12/06/raspberry-pi-to-create-a-wireless-relay-science-internet-router.html  用树莓派打造无线中继科学上网路由器

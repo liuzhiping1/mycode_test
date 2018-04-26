@@ -151,3 +151,4 @@ mke2fs
 mount -t ext3  -o data=wirte_back /dev/sda2 /mnt
 getfattr
 getfacl
+cal 显示日历
