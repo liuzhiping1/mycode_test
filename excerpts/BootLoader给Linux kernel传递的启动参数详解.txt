@@ -1,0 +1,70 @@
+BootLoader给Linux kernel传递的启动参数详解
+
+改变console loglevel的方法有如下几种：
+1.启动时Kernel boot option：loglevel=level
+2.运行时Runtime: dmesg -n level
+（注意：demsg -n level 改变的是console上的loglevel，dmesg命令仍然会打印出所有级别的系统信息。）
+3.运行时Runtime: echo $level > /proc/sys/kernel/printk
+4.运行时Runtime:写程序使用syslog系统调用（可以man syslog）
+
+下面介绍BootLoader给Linux 内核传递的启动参数：
+
+根文件系统相关启动参数：
+
+root #指出启动的根文件系统 如：root=/dev/sda1
+
+ro #指定根设备在启动过程中为read-only，默认情况下一般都是这样配的
+
+rw #和ro类似，它是规定为read-write，可写
+
+rootfstype #根文件系统类型，如：rootfstype=ext4
+
+Console和kernel log相关启动参数：
+
+console #console的设备和选项，如：console=tty0 console=ttyS0
+
+debug #enable kernel debugging 启动中的所有debug信息都会打印到console上
+
+quiet #disable all log messages 将kernel log level设置为KERN_WARNING，在启动中只非常严重的信息
+
+loglevel #设置默认的console日志级别，如：loglevel=7 （0~7的数字分别为：KERN_EMERG,..,KERN_DEBUG）
+
+ignore_loglevel #忽略loglevel级别，表示无论如何都会将信息输出到控制台上
+
+time #设置在每条kernel log信息前加一个时间戳
+
+内存相关的启动参数：
+
+mem #指定kernel使用的内存量，mem=n[KMG]
+
+hugepages #设置大页表页（4MB大小）的最多个数，hugepages=n
+
+CPU相关的启动参数：
+
+mce # Enable the machine check exception feature.
+
+nosmp #Run as a single-processor machine. 不使用SMP（多处理器）
+
+max_cpus #max_cpus=n, SMP系统最多能使用的CPU个数（即使系统中有大于n个的CPU）
+
+Ramdisk相关的启动参数：
+
+initrd #指定初始化ramdisk的位置，initrd=filename
+
+noinitrd #不使用initrd的配置，即使配置了initrd参数
+
+初始化相关启动参数：
+
+init #在启动时去执行的程序，init=filename，默认值为/sbin/init
+
+PCI相关的启动参数：
+
+pci #pci相关的选项，我常使用pci=assign_buses，也使用过pci=nomsi
+
+SELinux相关启动参数：
+
+enforcing #SELinux enforcing状态的开关，enforcing=0表示仅仅是记录危险而不是阻止访问，enforcing=1完全enable，默认值是0
+
+selinux #在启动时关闭或开启SELinux，selinux=0表示关闭，selinux=1表示开启selinux
+
+另外，还是用max_loop来指定最多可使用的回路设备。

@@ -1401,7 +1401,14 @@ valgrind： 检查内存错误
 
 https://blog.csdn.net/gatieme/article/details/50939155 C++智能指针auto_ptr详解
 
-树莓派论坛：https://linux.cn/tech/raspberrypi/
+树莓派论坛：
+https://linux.cn/tech/raspberrypi/ linux-中国-树莓派
 http://www.shumeipai.net/thread-19043-1-1.html 树莓派配置文件说明
 https://linux.cn/article-8605-1.html  如何用树莓派控制 GPIO 引脚并操作继电器
+---------------------------------------------------------------------------------------------------------------------------------------------------
+20180426：
 http://shumeipai.nxez.com/2016/12/06/raspberry-pi-to-create-a-wireless-relay-science-internet-router.html  用树莓派打造无线中继科学上网路由器
+常用资源：线程，文件，socket等
+
+基于进程的多任务处理是程序的并发执行。
+基于线程的多任务处理是同一程序的片段的并发执行。	

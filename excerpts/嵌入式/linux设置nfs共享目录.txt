@@ -1,0 +1,81 @@
+http://blog.sina.com.cn/s/blog_5d0e8d0d01014tt2.html
+
+一、查看是否安装NFS（portmap是用于RPC传输的）
+# rpm -q nfs-utils portmap
+nfs-utils-1.0.9-47.el5_5
+portmap-4.0-65.2.2.1
+二、配置
+1。配置文件
+# vi /etc/exports
+配置实例：
+1）/nfs/public 192.168.16.0/24(rw,async) *(ro)
+共享目录    客户机1                   客户机2
+nfs/public共享目录可供子网192.168.16.0/24中的所有客户端进行读写操作，其它网络中的客户端只能有读取操作权限。
+2）/home/test 192.168.0.0/24(rw,no_root_squash,async)
+no_root_squash：不讲root用户及所属用户组映射为匿名用户或用户组，默认root是被映射为匿名用户的nfsnobody，所有即使开 了rw写权限，客户机也使无法写入的，这个不映射为匿名用户，还保留原来的用户权限就可以读写了，因为一般都是用root用户登录的。
+注意：当客机是否有写权限时，还要看该目录对该用户有没有开放写入权限
+ 
+三、维护NFS
+格式：
+exportfs 选项参数
+-a:输出/etc/exports中设置的所有目录
+-r:重新读取/etc/exports文件中的设置，并且立即生效，而不需要重新启动NFS服务。
+-u:停止输出某一目录
+-v:在输出目录时，将目录显示在屏幕上。
+1.修改vi /etc/exports后，不用重启服务，直接使用命令输出共享目录
+# exportfs -rv
+2.停止输出所有共享目录
+# exportfs -auv
+四、启动和停止NFS服务
+1.启动NFS服务
+为了是NFS正常工作，需要启动portmap和nfs这两个目录，并且portmap一定要先于nfs启动。
+# /etc/init.d/portmap start
+# /etc/init.d/nfs start
+2.停止NFS 服务
+停止NFS服务器前，需要先停止NFS服务再停止portmap服务。如果系统中还有其它服务需要portmap时，则可以不用停止portmap服务。
+/etc/init.d/nfs stop
+/etc/init.d/portmap stop
+3。自启动NFS服务
+chkconfig --level 35 portmap on
+chkconfig --level 35 nfs on
+五、测试
+1.检查输出目录所使用的选项
+在/etc/exports配置文件中，即使只设置了一两个选项，在真正输出目录时，实际上还带了很多某人选项。通过查看 /var/lib/nfs/etab文件，就可以知道真正输出目录时，都是用了什么选项。
+2.使用showmount测试NFS输出目录状态
+格式：
+showmount 参数选项 nfs服务器名称或地址
+-a:显示指定的nfs服务器的所有客户端主机及其所连接的目录
+-d:显示指定的nfs服务器中已经被客户端连接的所有共享目录
+-e:显示指定的nfs服务器上所有输出的共享目录
+（1）查看所有输出的共享目录
+# showmount -e
+（2）显示所有被挂载的所有输出目录
+# showmount -d
+ 六、nfs客户端使用配置
+1.查看nfs服务器信息
+在客户端，要查看nfs服务器上有哪些共享目录，可以使用showmount命令。
+# showmount -e 192.168.0.51
+如果出现报错信息，首先查看服务器nfs和portmap服务是否启动。再看是否被防火墙屏蔽掉了。
+2.挂载nfs服务器上的共享目录
+ # mount -t nfs 192.168.0.51:/home/test /mnt/
+-t:指定挂载设备的文件类型（nfs是网络文件系统）
+192.168.0.51：nfs服务器ip地址
+/home/test ：nfs服务器的共享目录
+/mnt/：挂载在本地的目录
+3.卸载nfs
+在不使用nfs目录时，可以用umount命令来卸载该目录
+注意：当有客户机正在连接nfs服务器时，此时想要将nfs服务器关机，应该先关掉portmap和nfs这两个服务，否则要等很久才能正常关机。如果无 法将portmap和nfs关掉，就直接kill掉进程。也可以用exportmap －auv命令将当前主机中的所有输出目录停止后再关机。
+ 
+ 4.启动时自动连接nfs服务器
+要先在启动时自动连接nfs服务器上的共享目录，要编辑/etc/fstab文件。在文件中加入
+192.168.0.51:/home/test /mnt nfs defaults 0 0
+192.168.0.51:/home/test:nfs服务器的共享目录
+/mnt：本机挂载目录
+ 
+－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－－
+拷贝时cp命令常用参数
+cp -a -v /mnt /home/
+- a 该选项通常在拷贝目录时使用。它保留链接、文件属性，并递归地拷贝目录，其作用等于dpR选项的组合。
+-v或–verbose 　显示指令执行过程。
+-V<备份方式>或–version-control=<备份方式> 　用”-b”参数备份目标文件后，备份文件的字尾会被加上一个备份字符串，这字符串不仅可用”-S”参数变更，当使用”-V”参数指定不同备份方式时，也 会产生不同字尾的备份字串。
+- i 和f选项相反，在覆盖目标文件之前将给出提示要求用户确认。回答y时目标文件将被覆盖，是交互式拷贝。

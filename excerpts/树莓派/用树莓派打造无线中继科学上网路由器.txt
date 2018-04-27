@@ -1,0 +1,345 @@
+用树莓派打造无线中继科学上网路由器
+admin2016年12月6日  4 Comments
+请各位看官注意两个关键字：无线中继 科学上网。（感谢 Tony 的投稿）
+
+为什么要做无线中继？因为两个场景：第一个是在我司，WIFI上网同一账户只能连接两个设备，现在两个设备哪里够？第二个场景是在宾馆，我希望就像在家里一样，所有设备都是连上路由器就可以免设置科学上网，这就需要对宾馆原来的WIFI进行处理
+
+为什么要随时科学上网？我只能说，为了知识和真相
+树莓派使用的系统：RASPBIAN JESSIE
+
+另外，因为手头没有路由器，因此，本文介绍利用电脑直连树莓派进行相关设置。不多说，开始了。
+
+1.设置IP
+按照树莓派官方的做法，树莓派需要一根网线直连路由器，通过路由器的DHCP分配到IP后，就可以远程登录了。但是刚才已经提到，因为手头没有路由器，所以我们需要用电脑直连树莓派进行远程登录。将制作好的树莓派SD卡插入电脑，会弹出一个名为Boot的磁盘，其中有一个cmdline.txt文件，打开之后，在最后的位置追加一个IP如下：
+
+1
+dwc_otg.lpm_enable=0 console=serial0,115200 console=tty1 root=/dev/mmcblk0p2 rootfstype=ext4 elevator=deadline fsck.repair=yes rootwait ip=192.168.3.1
+插回SD卡至树莓派，通电后，将我们的电脑端IP设置为192.168.3.100，掩码设置为255.255.255.0即可连接树莓派了
+
+
+2.更改磁盘大小和LOCALE
+树莓派默认并没有用足所有的SD卡，具体原因未知。但是也很好调整。运行sudo raspi-config，可以打开树莓派设置窗口：
+20161206123413973-0
+设置窗口 第一项，就是将文件系统扩展到整个SD卡。顺便把第五项中的语言项也改了吧，否则在安装软件时，总会提示language没有设置，我一般会选择生成en_US.UTF-8以及zh_CN.UTF-8，默认语言使用赵家语言（选择时，使用空格键来切换选中／未选）。
+
+3.更改WIFI国别
+为什么要更改WIFI国别？因为按照规范，各国的频谱不一样，详见这里，如果不更改，树莓派默认使用大英帝国，直接的影响就是，可能某些5G信道会搜索不到。
+
+编辑/etc/wpa_supplicant/wpa_supplicant.conf，更改country为CN
+
+4.安装第一块WIFI适配器
+因为我司所在的WIFI环境支持5G信号，因此，在选择WIFI适配器时，我选择了TP-LINK TL-WDN3321，该设备插入即可使用，免驱动。
+
+5.配置基于WPA-EAP的WIFI认证
+我司使用了基于PEAP和MSCHAPV2的WPA-EAP的WIFI认证，但是没有使用证书。
+
+配置时，只需要在/etc/wpa_supplicant/wpa_supplicant.conf增加如下段落即可
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+network={
+    ssid="ssid"
+    key_mgmt=WPA-EAP
+    eap=PEAP
+    identity="id"
+    password="password"
+    #ca_cert="/etc/cert/ca.pem"
+    #phase1="peaplabel=1"
+    phase2="auth=MSCHAPV2"
+    priority=10
+}
+更改其中的ssid identity和password为你所在环境的配置。
+
+配置文件中可以有多个network配置，系统会根据搜索到的ssid来自动匹配
+
+6.连接WIFI
+连接WIFI其实就是一个重新加载配置的过程，先执行sudo ifdown wlan0，再执行sudo ifup wlan0即可。之后，可以利用iwconfig命令查看wifi配置是否已经加载，用ifconfig来查看是否分配到IP，如果一切顺利，就应该能够上网了。
+
+7.更改为中科大的源
+树莓派的apt-get的源在英国，因此访问起来比较缓慢。感谢中国科学技术大学 Linux 用户协会做了镜像，编辑/etc/apt/sources.list，删除其中的内容，使用一下内容代替
+
+1
+deb http://mirrors.ustc.edu.cn/raspbian/raspbian/ jessie main non-free contrib
+之后运行sudo apt-get update来更新源
+
+8.固定接口名称
+什么叫固定接口名称？当我们插入WIFI适配器时，尤其是我们的整个方案中，会使用两个WIFI适配器时，系统会随机分配哪个是wlan0，哪个是wlan1。因为两个适配器不一样，会导致运行在上面的配置可能没办法生效。因此，我们必须让系统记住WIFI适配器使用的接口名称。
+
+编辑新增文件/etc/udev/rules.d/10-network.rules，其中的内容如下：
+
+1
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="aa:bb:cc:dd:ee:ff", NAME="wlan0"
+注意其中的mac地址，设置为你的设备的mac地址。获得mac地址，可以使用命令ip link
+
+重启系统后，再插入设备，就会绑定接口名称
+
+9.更改eth0的IP
+前面的第一步中，我们使用了一个变相的手法分配了树莓派的IP。但是我发现在该模式一下有一个问题：如果不插网线，树莓派启动时会很长一段时间都在等待插入网线。
+
+既然已经进入了系统，我们自然还原为标准的配置。编辑文件/etc/network/interfaces，将eth0的配置改为如下
+
+1
+2
+3
+4
+auto eth0
+iface eth0 inet static
+    address 192.168.3.1
+    netmask 255.255.255.0
+然后编辑/boot/cmdline.txt,去掉第一步中增加的IP配置
+
+10.安装dnsmasq来设置DHCP服务
+先来说明一下我的网段设置，有线网络使用192.168.3这个网段，而无线AP端，使用192.168.4这个网段。
+
+很多博文使用udhcpd来做作DHCP服务器，但是考虑到将来要科学上网，既然dnsmasq就可以做这个事，那就只用它好了。
+
+使用命令sudo apt-get install dnsmasq，编辑/etc/dnsmasq.conf，注意更改如下几段：
+
+1
+2
+3
+4
+5
+#配置监听地址
+listen-address=127.0.0.1,192.168.3.1,192.168.4.1
+#配置DHCP分配段
+dhcp-range=192.168.3.50,192.168.3.150,12h
+dhcp-range=192.168.4.50,192.168.4.150,12h
+运行命令sudo service dnsmasq restart来启用
+
+11.开启包转发
+Linux系统默认关闭了IP包转发，因此不能做路由器。所以需要先打开包转发
+
+编辑/etc/sysctl.conf，去掉以下属性前的注释:
+
+1
+2
+# Uncomment the next line to enable packet forwarding for IPv4
+net.ipv4.ip_forward=1
+运行sudo sysctl -p来启用
+
+之后运行
+
+1
+sudo iptables -t nat -A POSTROUTING -o wlan0 -j MASQUERADE
+来启用wlan0端口的NAT
+
+12.安装iptables-persistent
+上一步中，我们启用了一条防火墙规则，但是防火墙规则重启后就丢失了，为了能够规则开机自动加载，我们可以使用iptables-persistent。用命令sudo apt-get install iptables-persistent来安装该组件，根据其提示进行初次设置（一路确认）。该组件默认会将防火墙规则保存到/etc/iptables/rules.v4中。你可以使用如下命令保存和读入规则:
+
+1
+2
+3
+4
+#保存现有规则
+sudo service netfilter-persistent save
+#读取并应用先有规则
+sudo service netfilter-persistent reload
+为什么服务名称变成了netfilter-persistent，这里面好像有故事，留待以后再digg
+
+13.安装第二块WIFI适配器
+第一块WIFI适配器是为了连接现有网络，第二块则是为了建立WIFI热点。为了建立WIFI热点，适配器必须具有AP的mode。可以使用命令iw list|grep -A10 ‘Supported interface modes’查看。比如，我选用的设备是widemac SL-1506N，其参数如下：
+
+Supported interface modes:
+* IBSS
+* managed
+* AP
+* AP/VLAN
+* WDS
+* monitor
+* mesh point
+
+该设备依然是插入即可，不需要驱动。
+
+14.设置第二块Adapter的IP
+依然是编辑/etc/network/interfaces,更改wlan1的配置如下
+
+1
+2
+3
+4
+auto wlan1
+iface wlan1 inet static
+    address 192.168.4.1
+        netmask 255.255.255.0
+15.固定第二块WIFI适配器的接口名称
+做法类似于第一块，只不过再加入一行而已，接口名称为wlan1,这里就不说了，记得重启让其生效。
+
+16.安装并开启hostapd
+Linux启用WIFI热点，使用的是hostapd。首先，用命令sudo apt-get install hostapd安装它，然后增加配置文件/etc/hostapd/hostapd.conf如下：
+
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+interface=wlan1
+driver=nl80211
+ssid=ssid
+hw_mode=g
+channel=13
+macaddr_acl=0
+auth_algs=1
+ignore_broadcast_ssid=0
+wpa=2
+wpa_passphrase=passwd
+wpa_key_mgmt=WPA-PSK
+wpa_pairwise=TKIP
+rsn_pairwise=CCMP
+只需要更改其中的ssid和wpa_passphrase属性。
+
+之后运行命令sudo hostpad -d /etc/hostapd/hostapd.conf来观察测试，没有错误可以连接，就OK了。 CTRL＋C后，编辑/etc/default/hostapd，改变DAEMON_CONF的配置如下
+
+1
+DAEMON_CONF="/etc/hostapd/hostapd.conf"
+之后就可以使用sudo service hostapd start正式启动WIFI热点了
+
+至此，通常一个WIFI中继路由器就好了，以下介绍透明科学上网部分
+
+17.建立无污染DNS
+以前都需要使用chinadns等项目，现在基本上都直接使用中科大的DNS，直接无污染。在/etc/dnsmasq.conf，加入如下规则
+
+1
+2
+3
+no-resolv
+server=202.38.93.153
+server=202.141.162.123
+重启dnsmasq，可以用dig t.co测试一下
+
+18.安装shadowsocks
+这里首先要说明一下，我找了很久，也没有找到适合树莓派的shadowsocks-libev，因此，我们使用了redsocks+shadowsocks的组合来替代。
+
+树莓派源中的shadowsocks的版本很低，连rc4-md5都不支持。因此，我们使用pip安装，键入sudo pip install shadowsocks即可安装，之后新建配置文件/etc/shadowsocks.conf如下
+
+1
+2
+3
+4
+5
+6
+7
+8
+    "server":"xxx.xxx.xxx.xxx",
+    "server_port":8964,
+    "local_address":"0.0.0.0",
+    "local_port":1080,
+    "password":"password",
+    "timeout":600,
+    "method":"rc4-md5"
+}
+然后用命令sudo sslocal -c /etc/shadowsocks.conf -d start来启动
+
+没有问题，就将sslocal -c /etc/shadowsocks.conf -d start加入/etc/rc.local来让其开机启动
+
+19.安装redsocks
+执行sudo apt-get install redsocks来安装软件，之后编辑/etc/redsocks.conf,更改其中的redsocks部分如下
+
+1
+2
+3
+4
+5
+6
+redsocks {
+    local_ip = 0.0.0.0;
+    local_port = 12345;
+    ip = 127.0.0.1;
+    port = 1080;
+}
+使用命令sudo service redsocks start来启动软件
+
+可以使用netstat -an|grep 1080和netstat -an|grep 12345来确认一下shadowsocks和redsocks都启动了
+
+20.安装ipset并导入chnroute
+我们科学翻墙的规则：凡是国外的网站都用shadowsocks加速。因此，我们借助于ipset保存国内ip段。先用sudo apt-get install ipset安装软件
+
+执行命令
+
+1
+curl 'http://ftp.apnic.net/apnic/stats/apnic/delegated-apnic-latest' | grep ipv4 | grep CN | awk -F\| '{ printf("%s/%d\n", $4, 32-log($5)/log(2)) }' > chnroute.txt
+来导出国内ip段
+
+然后用如下命令导入到ipset
+
+1
+2
+sudo ipset create chnroute hash:net
+cat chnroute.txt | sudo xargs -I ip ipset add chnroute ip
+21.备份ipset并开机载入
+各位看官可能已经发现，导入ipset的过程非常缓慢，不适合每次开机都执行。我们可以将ipset的结果保存，每次开机导入。执行如下命令
+
+1
+sudo ipset save chnroute > /etc/chnroute.ipset
+然后在/etc/rc.local中加入如下语句
+
+1
+ipset restore < /etc/chnroute.ipset
+即可开机执行
+
+22.导入防火墙规则
+1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+sudo iptables -t nat -N SHADOWSOCKS
+ 
+sudo iptables -t nat -A SHADOWSOCKS -d $server_IP -j RETURN
+ 
+sudo iptables -t nat -A SHADOWSOCKS -d 0.0.0.0/8 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -d 10.0.0.0/8 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -d 127.0.0.0/8 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -d 169.254.0.0/16 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -d 172.16.0.0/12 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -d 192.168.0.0/16 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -d 224.0.0.0/4 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -d 240.0.0.0/4 -j RETURN
+sudo iptables -t nat -A SHADOWSOCKS -m set --match-set chnroute dst -j RETURN
+ 
+sudo iptables -t nat -A SHADOWSOCKS -p tcp -j REDIRECT --to-ports 12345
+ 
+sudo iptables -t nat -A OUTPUT -p tcp -j SHADOWSOCKS
+sudo iptables -t nat -A PREROUTING -p tcp -j SHADOWSOCKS
+其中server_IP是你的VPS的地址
+
+然后保存规则
+
+1
+sudo service netfilter-persistent save
+23.开机重新生效防火墙规则
+既然iptables-persistent可以开机加载防火墙规则，为什么还要谈这个？因为防火墙规则中，有使用到redsocks的端口12345，但是因为启动顺序问题，很可能redsocks还没有启动，防火墙规则先加载了，所以会导致防火墙规则加载失败。因此，我们需要把规则加载放入/etc/rc.local中:
+
+1
+iptables-restore < /etc/iptables/rules.v4
+至此，整个教程就写完了。这些步骤是我实验了三四遍之后的经验所得，原载于 https://story.tonylee.name/2016/03/31/yong-shu-mei-pai-da-zao-wu-xian-zhong-ji-ke-xue-shang-wang-lu-you-qi/。
