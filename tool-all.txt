@@ -1,0 +1,26 @@
+
+winds:
+source insight 代码编辑器
+notepad++ 代码编辑器
+mybase 做笔记
+TortoiseGit 版本管理
+beyond compare 代码比对
+putty 终端客户端
+secureCRT
+Xshell
+VM 虚拟机
+virtual box 虚拟机
+keil IDE开发环境
+IAR IDE开发环境
+wireshark 网络调试工具
+...
+
+linux:
+vim
+shell
+makefile
+automake
+autoconf
+ctags
+git
+...

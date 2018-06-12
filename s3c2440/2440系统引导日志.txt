@@ -1,0 +1,154 @@
+Enter your selection: 8
+Start Linux ...
+Copy linux kernel from 0x00200000 to 0x30008000, size = 0x00300000 ... Copy Kernel to SDRAM done,NOW, Booting Linux......
+Uncompressing Linux........................................................................................................................ done, booting the kernel.
+Linux version 2.6.25.8-EmbedSky (root@EmbedSky) (gcc version 4.3.3 (Sourcery G++ Lite 2009q1-176) ) #6 Tue Jun 1 11:57:47 CST 2010
+CPU: ARM920T [41129200] revision 0 (ARMv4T), cr=c0007177
+Machine: SMDK2440
+ATAG_INITRD is deprecated; please update your bootloader.
+Memory policy: ECC disabled, Data cache writeback
+CPU S3C2440A (id 0x32440001)
+S3C244X: core 400.000 MHz, memory 100.000 MHz, peripheral 50.000 MHz
+S3C24XX Clocks, (c) 2004 Simtec Electronics
+CLOCK: Slow mode (1.500 MHz), fast, MPLL on, UPLL on
+CPU0: D VIVT write-back cache
+CPU0: I cache: 16384 bytes, associativity 64, 32 byte lines, 8 sets
+CPU0: D cache: 16384 bytes, associativity 64, 32 byte lines, 8 sets
+Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 16256
+Kernel command line: noinitrd root=/dev/mtdblock2 init=/linuxrc console=ttySAC0
+irq: clearing pending ext status 00080000
+irq: clearing subpending status 00000003
+irq: clearing subpending status 00000002
+PID hash table entries: 256 (order: 8, 1024 bytes)
+timer tcon=00500000, tcnt a2c1, tcfg 00000200,00000000, usec 00001eb8
+Console: colour dummy device 80x30
+console [ttySAC0] enabled
+Dentry cache hash table entries: 8192 (order: 3, 32768 bytes)
+Inode-cache hash table entries: 4096 (order: 2, 16384 bytes)
+Memory: 64MB = 64MB total
+Memory: 60860KB available (3380K code, 368K data, 232K init)
+SLUB: Genslabs=12, HWalign=32, Order=0-1, MinObjects=4, CPUs=1, Nodes=1
+Mount-cache hash table entries: 512
+CPU: Testing write buffer coherency: ok
+net_namespace: 152 bytes
+NET: Registered protocol family 16
+S3C2440: Initialising architecture
+S3C2440: IRQ Support
+S3C24XX DMA Driver, (c) 2003-2004,2006 Simtec Electronics
+DMA channel 0 at c4800000, irq 33
+DMA channel 1 at c4800040, irq 34
+DMA channel 2 at c4800080, irq 35
+DMA channel 3 at c48000c0, irq 36
+S3C244X: Clock Support, DVS off
+SCSI subsystem initialized
+usbcore: registered new interface driver usbfs
+usbcore: registered new interface driver hub
+usbcore: registered new device driver usb
+NET: Registered protocol family 2
+IP route cache hash table entries: 1024 (order: 0, 4096 bytes)
+TCP established hash table entries: 2048 (order: 2, 16384 bytes)
+TCP bind hash table entries: 2048 (order: 1, 8192 bytes)
+TCP: Hash tables configured (established 2048 bind 2048)
+TCP reno registered
+NetWinder Floating Point Emulator V0.97 (double precision)
+yaffs Jun  1 2010 11:47:31 Installing. 
+io scheduler noop registered (default)
+Console: switching to colour frame buffer device 60x17
+fb0: s3c2410fb frame buffer device
+TQ2440/SKY2440 LEDS, (c) 2008,2009 www.embedsky.net
+EmbedSky-leds initialized
+TQ2440/SKY2440 Beep, (c) 2008,2009 www.embedsky.net
+EmbedSky-Beep initialized
+s3c2440-uart.0: tq2440_serial0 at MMIO 0x50000000 (irq = 70) is a S3C2440
+s3c2440-uart.1: tq2440_serial1 at MMIO 0x50004000 (irq = 73) is a S3C2440
+s3c2440-uart.2: tq2440_serial2 at MMIO 0x50008000 (irq = 76) is a S3C2440
+loop: module loaded
+PPP generic driver version 2.4.2
+PPP Deflate Compression module registered
+PPP BSD Compression module registered
+PPP MPPE Compression module registered
+NET: Registered protocol family 24
+PPPoL2TP kernel driver, V1.0
+SLIP: version 0.8.4-NET3.019-NEWTTY (dynamic channels, max=256) (6 bit encapsulation enabled).
+CSLIP: code copyright 1989 Regents of the University of California.
+SLIP linefill/keepalive option.
+dm9000 Ethernet Driver
+eth%d: Invalid ethernet MAC address.  Please set using ifconfig
+Now use the default MAC address: 10:32:54:76:98:ba
+eth0: dm9000 at c480e000,c4810004 IRQ 51 MAC: 10:32:54:76:98:ba
+Linux video capture interface: v2.00
+Driver 'sd' needs updating - please use bus_type methods
+S3C24XX NAND Driver, (c) 2004 Simtec Electronics
+s3c2440-nand s3c2440-nand: Tacls=2, 20ns Twrph0=3 30ns, Twrph1=2 20ns
+NAND device: Manufacturer ID: 0x01, Chip ID: 0xda (AMD NAND 256MiB 3,3V 8-bit)
+NAND_ECC_NONE selected by board driver. This is not recommended !!
+Scanning device for bad blocks
+Creating 3 MTD partitions on "NAND 256MiB 3,3V 8-bit":
+0x00000000-0x00040000 : "EmbedSky_Board_uboot"
+0x00200000-0x00500000 : "EmbedSky_Board_kernel"
+0x00500000-0x10000000 : "EmbedSky_Board_yaffs2"
+usbmon: debugfs is not available
+Initial EmbedSky TWO USB HOST Driver!
+s3c2410-ohci s3c2410-ohci: S3C24XX OHCI
+s3c2410-ohci s3c2410-ohci: new USB bus registered, assigned bus number 1
+s3c2410-ohci s3c2410-ohci: irq 42, io mem 0x49000000
+usb usb1: configuration #1 chosen from 1 choice
+hub 1-0:1.0: USB hub found
+hub 1-0:1.0: 2 ports detected
+Initializing USB Mass Storage driver...
+usbcore: registered new interface driver usb-storage
+USB Mass Storage support registered.
+mice: PS/2 mouse device common for all mice
+EmbedSky TouchScreen successfully loaded
+input: EmbedSky TouchScreen as /class/input/input0
+S3C24XX RTC, (c) 2004,2006 Simtec Electronics
+s3c2410-rtc s3c2410-rtc: rtc disabled, re-enabling
+s3c2410-rtc s3c2410-rtc: rtc core: registered s3c as rtc0
+i2c /dev entries driver
+s3c2440-i2c s3c2440-i2c: slave address 0x10
+s3c2440-i2c s3c2440-i2c: bus frequency set to 390 KHz
+s3c2440-i2c s3c2440-i2c: i2c-0: S3C I2C adapter
+s3c2440-sdi s3c2410-sdi: unable to get DMA channel.
+s3c2440-sdi s3c2410-sdi: powered down.
+s3c2440-sdi s3c2410-sdi: initialisation done.
+usbcore: registered new interface driver hiddev
+usbcore: registered new interface driver usbhid
+drivers/hid/usbhid/hid-core.c: v2.6:USB HID core driver
+s3c2440-sdi s3c2410-sdi: powered down.
+UDA1341 audio driver initialized
+Advanced Linux Sound Architecture Driver Version 1.0.16rc2 (Thu Jan 31 16:40:16 2008 UTC).
+ASoC version 0.13.2
+ALSA device list:
+  No soundcards found.
+TCP cubic registered
+NET: Registered protocol family 1
+NET: Registered protocol family 17
+RPC: Registered udp transport module.
+RPC: Registered tcp transport module.
+s3c2410-rtc s3c2410-rtc: hctosys: invalid date/time
+yaffs: dev is 32505858 name is "mtdblock2"
+yaffs: passed flags ""
+yaffs: Attempting MTD mount on 31.2, "mtdblock2"
+yaffs: auto selecting yaffs2
+VFS: Mounted root (yaffs filesystem).
+Freeing init memory: 232K
+hwclock: settimeofday: Invalid argument
+Start PDA
+modprobe: chdir(2.6.25.8-EmbedSky): No such file or directory
+modprobe: chdir(2.6.25.8-EmbedSky): No such file or directory
+modprobe: chdir(2.6.25.8-EmbedSky): No such file or directory
+Try to bring net interface up ...
+ifconfig eth0 hw ether 10:23:45:67:89:ab
+eth0: link down
+ifconfig eth0 192.168.1.6 netmask 255.255.255.0 up
+add default gw 192.168.1.2
+Done
+open device leds: No such file or directory
+/dev/watchdog: No such file or directory
+[01/Jan/1970:00:00:05 +0000] boa: server version Boa/0.94.13
+[01/Jan/1970:00:00:05 +0000] boa: server built Jul 29 2009 at 14:27:34.
+[01/Jan/1970:00:00:05 +0000] boa: starting server pid=347, port 80
+
+Please press Enter to activate this console. eth0: link up, 100Mbps, full-duplex, lpa 0xCDE1
+
+[root@EmbedSky /]# 

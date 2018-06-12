@@ -1,0 +1,27 @@
+
+1.bridge :
+默认使用vmnet0
+将虚拟机的ip设置与主机同网段未使用ip,其余与主机相同:
+例如主机ip是10.70.54.31,设置虚拟机ip为10.70.54.22。netmask,broadcast,gateway,dns都与主机相同即可实现虚拟机<--->主机虚拟机<---->互联网 通信。
+2.nat :
+默认使用vmnet8
+将虚拟机设置成使用dhcp方式上网,windows下选择"自动获取ip",Linux下开启dhcp服务即可
+也可以手动设置:
+ip设置与vmnet8同网段,gateway设置成vmnet8的gateway(/etc/vmware/vmnet8/nat/nat.conf)中可以查到vmnet8的gateway,通常是xxx.xxx.xxx.2。
+netmask,broadcast设置与vmnet8相同,dns设置与主机相同。
+例如 vmnet8 ip:172.16.249.1 gw :172.16.249.2
+虚拟机设置: ip :172.16.249.100 gw: 172.16.249.2
+3.host-only :
+默认使用vmnet1
+将虚拟机ip设置与vmnet1同网段,gateway设置成vmnet1的ip,其余设置与vmnet1相同,dns设置与主机相同
+例如 vmnet1 ip :172.16.245.1
+虚拟机设置: ip :172.16.245.100 gateway :172.16.245.1
+这样就实现了虚拟机<--->主机 通信,但是虚拟机<--->互联网 仍无法通信
+虚拟机与互联网通信：
+1.开启主机路由功能
+2.设定iptables，使主机成为一台nat server
+1. echo 1 >/proc/sys/net/ipv4/ip_forward 这样就主机就具有了路由功能
+2. iptables -t nat -A POSTROUTING -o eth0 -s 172.16.245.0/24 -j MASQUERADE
+这条规则意思是将来自172.16.245.0/24封包的来源ip伪装成eth0的ip，实现虚拟机与互联网通信
+如果网络接口是ppp+或pppoe则需要修改成-o pppoe
+当然-s 172.16.245.0/24 也要根据实际情况修改。

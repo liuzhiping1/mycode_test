@@ -1,0 +1,21 @@
+在阿里云上安装git所遇到的问题  https://yq.aliyun.com/articles/28256
+
+1、下载源码- 解压-配置-编译-安装-设定环境
+ wget https://github.com/git/git/archive/v2.2.1.tar.gz
+ tar zxvf v2.2.1.tar.gz
+cd git-2.2.1
+make configure
+./configure --prefix=/usr/local/git/ --with-iconv=/usr/local/libiconv --with-curl=/home/{username}/curl/
+make
+make install
+echo "export PATH=$PATH:/usr/local/git/bin" >> /etc/bashrc
+source /etc/bashrc
+
+2、遇到的问题：编译git时报错： zlib.h: No such file or directory
+开发包没有安装zlib和zlib-devel
+去官网或github下载源码下载安装
+下载用wget命令
+下载rpm安装包时用rpm -ivh **.rpm安装
+下载源码看readme找安装提示
+
+可以向在redhat用yum一样用zypper安装

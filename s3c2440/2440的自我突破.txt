@@ -1,0 +1,28 @@
+1、u-boot:引导系统软件，命令行形式配置系统（类似git那种），传递参数给内核
+reset(start.s) ->
+CopyCode2Ram(boot_init.c) ->
+_start_armboot ->
+start_armboot(board.c) ->
+main_loop (main.c)
+run_command(main.c)
+readline(main.c)
+main_menu_usage(cmd_menu.c)
+
+（make ARCH=arm Embedsky_config;make）编译器版本gcc-4.3.3
+2、linux内核：系统平台软件，管理设备和资源等
+编译大致顺序：arch -> kernel -> mm ->fs ->ipc ->block ->drivers ->sound ->
+->net
+编译结果：vmlinux、System.map、 arch/arm/boot/Image 
+arch/arm/boot/compressed/head.o arch/arm/boot/compressed/piggy.gz arch/arm/boot/compressed/piggy.o
+arch/arm/boot/compressed/misc.o arch/arm/boot/compressed/vmlinux
+2.1 、linux内核移植： （详细见天嵌的内核移植文档）
+a)修改对arm的支持，ARCH=arm CROSS_COMPILE=arm-linux-
+b)修改平台输入时钟 arch/arm/mach-s3c2440/mach-smdk2440.c 
+c)制作配置单make menuconfig
+d)修改机器码u-boot中设定了机器码，所以内核也要修改机器码否则不能启动
+	保存在arch/arm/tools/mach-types （当前内核版本还没有用到设备树）
+e)镜像编译 make zImage ;在arch/arm/boot里面修改Makefile移动到其他地方
+（一般烧完文件系统之后要关机重启一下）
+	
+3、yaffs2文件系统的构建制作
+a)busybox的配置编译安装
