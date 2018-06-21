@@ -1,3 +1,4 @@
+一般MCU执行流程：上电 ->reset -> 跳转向量表（中断程序的地址） -> 引导阶段-> 数据/外设等初始化-> 执行任务/中断处理程序
 1、u-boot:引导系统软件，命令行形式配置系统（类似git那种），传递参数给内核
 reset(start.s) ->
 CopyCode2Ram(boot_init.c) ->
@@ -26,3 +27,68 @@ e)镜像编译 make zImage ;在arch/arm/boot里面修改Makefile移动到其他�
 	
 3、yaffs2文件系统的构建制作
 a)busybox的配置编译安装
+
+4、arm架构cortex-M3 架构指南-> 数据手册/参考手册 -> 开发指南（裸机）
+**总线接口：
+I-Code总线-0x0000_0000 - 0x1fff_ffff 以字（32bits）的长度执行 取指令操作
+D-Code总线-0x0000_0000 - 0x1fff_ffff 数据访问操作，对齐
+系统总线-0x2000_0000 - 0xDfff_ffff和0xE010_0000 - 0xffff_ffff 数据和指令操作，对齐
+私有外设总线0xE004_0000 - 0xE00F_FFFF，由于部分被PTIU，ETM以及ROM表用掉。
+
+**NVIC ：0xe000_e000
+中断的使能/除能：
+悬起/解悬：中断发生时，在处理同级中断或更高级中断时，该中断不能得到响应，被悬起。
+优先级：
+活动状态：在处理器执行ISR的第一条指令时，活动状态位被置1
+屏蔽中断：特殊功能寄存器-PRIMASK/FAULTMASK/BASEPRI寄存器
+软件中断：0xe000_ef00[8:0] INTID 相当于指定某个中断产生了中断，并悬起（除了NMI/faults/PendSV）
+systick定时器：异常号-15，能产生中断，有向量表 
+PSP-线程堆栈：用户的应用程序代码使用
+MSP-主堆栈：复位后缺省使用的堆栈指针，用于操作系统内核以及异常处理例程（包括中断服务例程）
+
+**调试：CoreSight
+ SW-DP/SWJ-DP
+ 调试模式-halt模式和调试监视器模式
+ 【通过设置寄存器（包括特殊功能寄存器）来达到对单片机的控制】
+ 特殊功能寄存器DHCSR的C_DEBUGEN位置1则系统进入停机模式，只能有调试器来设置。然后可以置位 DHCSR.C_HALT来喊停（详见指南的调试系统架构）
+ 特殊功能寄存器DEMCR用来控制调试监视器模式。
+ 
+**开始M3的开发
+选择芯片要考虑：存储器、外设配置、最高主频、外中断数目、表达优先级的位数、是否匹配MPU、是否匹配ETM、对调试接口的选择（SW/JTAG）等
+
+**cortex-M3的底层编程
+C和汇编
+C和汇编的接口，使用R0-R3、R12传递参数
+
+5、对比stm32库启动代码和2440的boot引导代码
+2440：Configure memory, ISR ,stacks Initialize C-variables
+stm32：
+ - Set the initial SP
+ - Set the initial PC == _iar_program_start,
+ - Set the vector table entries with the exceptions ISR 
+   address.
+ - Configure the system clock and the external SRAM mounted on 
+   STM324xG-EVAL board to be used as data memory (optional, 
+   to be enabled by user)
+ - Branches to main in the C library (which eventually
+   calls main()).
+6、CMSIS cortex-M软件接口标准
+arm公司做arm内核标准，芯片公司做不同配置的芯片产品
+-----------------------------------------------------------------------------------------------
+用户                                应用程序
+-----------------------------------------------------------------------------------------------
+实时操作系统                     实时内核 中间件
+-----------------------------------------------------------------------------------------------
+CMSIS                    内核外设函数 中间件函数 外设级函数
+                            外设寄存器和中断向量定义层
+-----------------------------------------------------------------------------------------------
+MCU        Cortex——CPU Systick实时内核定时器 NVIC嵌套向量中断控制器 调试/跟踪接口 其他外设
+-----------------------------------------------------------------------------------------------
+system_stm32f4xx.c/system_stm32f4xx.h 设置时钟总线
+stm32f4xx.h/stm32f4xx.c  片上外设访问层,外设寄存器，中断向量表
+stm32f4xx_conf.h 外设驱动配置文件
+E:\homework\Uniden_MHS335\Libraries\CMSIS\ST\STM32F4xx\Source\Templates\iar\startup_stm32f4xx.s 启动文件
+E:\homework\Uniden_MHS335\USER\DRV\DRV_BSP_STMF4\STM32F4_CMSIS\inc\core_cm4.h 外设访问层-一些编译器相关的定义，寄存器的封装
+
+7、ucosiii
+内核级服务线程：中断队列、空闲、tick、统计、定时器管理

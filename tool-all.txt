@@ -23,4 +23,6 @@ automake
 autoconf
 ctags
 git
+iproute2
+net-tools
 ...
