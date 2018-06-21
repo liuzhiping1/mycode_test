@@ -32,3 +32,9 @@ http://blog.csdn.net/wwwdc1012/article/details/78759326  linux系统调用列表
 https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/ 【linux主线】Linus Torvalds 的代码仓 
 https://www.cnblogs.com/wanghuaijun/p/6002718.html linux C函数库大全
 https://www.ibm.com/developerworks/cn/linux/l-makefile/ 例解 autoconf 和 automake 生成 Makefile 文件
+http://ffmpeg.org/ A complete, cross-platform solution to record, convert and stream audio and video.
+https://blog.csdn.net/danielpei1222/article/details/61916435 FFmpeg 基本用法
+http://www.alsa-project.org/alsa-doc/alsa-lib/pcm.html linux的音频处理
+https://www.cnblogs.com/lidabo/p/7235316.html 视频会议及流媒体十大开源项目
+https://blog.csdn.net/column/details/15511.html  ffmpeg实战教程
+https://blog.csdn.net/china_video_expert/article/category/1358488 一个很好的视频编解码博客

@@ -1,0 +1,1209 @@
+https://www.linuxidc.com/Linux/2011-03/33850.htm
+
+说明1：本文分析基于内核源码版本为linux-2.6.31 
+说明2：本文在理解了linux中总线、设备和驱动模型的基础上加以分析代码
+
+虽然Linux驱动程序应该是和具体的硬件平台分离的，但是为了更好的理解DM9000的驱动程序，这里还是结合一下Mini2440开发板，这样也可以更好的体会如何实现驱动和平台分离。
+
+本文分成以下几个部分： 
+一、Mini2440开发板上DM9000的电气连接和Mach-mini2440.c文件的关系。 
+二、两个重要的结构体介绍：sk_buff和net_device 
+三、具体代码分析
+
+一、Mini2440开发板上DM9000的电气连接和Mach-mini2440.c文件的关系 
+Mini2440开发板上DM9000与S3C2440的连接关系如下：  
+  
+其中片选信号AEN使用了nGCS4，所以网卡的内存区域在BANK4，也就是从地址0x20000000开始。DM9000的TXD[2:0]作为strap pin在电路图中是空接的，所以IO base是300H。中断使用了EINT7。这些内容在Mach文件中有如下体现：
+
+ 
+#define S3C2410_CS4 (0x20000000)  
+#define MACH_MINI2440_DM9K_BASE (S3C2410_CS4 + 0x300)   
+static struct resource mini2440_dm9k_resource[] __initdata = {    
+    [0] = {    
+        .start = MACH_MINI2440_DM9K_BASE,    
+        .end   = MACH_MINI2440_DM9K_BASE + 3,    
+        .flags = IORESOURCE_MEM    
+    },    
+    [1] = {    
+        .start = MACH_MINI2440_DM9K_BASE + 4,    
+        .end   = MACH_MINI2440_DM9K_BASE + 7,    
+        .flags = IORESOURCE_MEM    
+    },    
+    [2] = {    
+        .start = IRQ_EINT7,    
+        .end   = IRQ_EINT7,    
+        .flags = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,    
+    }    
+};  
+另外在Mach文件中还定义了DM9000平台设备，设备名称为“dm9000”，设备资源就是上面定义的IO和中断资源。代码清单如下：
+
+ 
+static struct dm9000_plat_data mini2440_dm9k_pdata __initdata = {   
+    .flags      = (DM9000_PLATF_16BITONLY | DM9000_PLATF_NO_EEPROM),   
+};   
+  
+static struct platform_device mini2440_device_eth __initdata = {   
+    .name       = "dm9000",   
+    .id     = -1,   
+    .num_resources  = ARRAY_SIZE(mini2440_dm9k_resource),   
+    .resource   = mini2440_dm9k_resource,   
+    .dev        = {   
+        .platform_data  = &mini2440_dm9k_pdata,   
+    },   
+};  
+这个DM9000平台设备作为众多平台设备中的一个在扳子初始化的时候就被添加到了总线上。代码清单如下：
+
+ 
+MACHINE_START(MINI2440, "MINI2440")   
+    /* Maintainer: Michel Pollet <buserror@gmail.com> */  
+    .phys_io    = S3C2410_PA_UART,   
+    .io_pg_offst    = (((u32)S3C24XX_VA_UART) >> 18) & 0xfffc,   
+    .boot_params    = S3C2410_SDRAM_PA + 0x100,   
+    .map_io     = mini2440_map_io,   
+    .init_machine   = mini2440_init, /*初始化函数*/  
+    .init_irq   = s3c24xx_init_irq,   
+    .timer      = &s3c24xx_timer,   
+MACHINE_END  
+  
+ 
+static void __init mini2440_init(void)   
+{   
+    ...   
+         ...   
+    platform_add_devices(mini2440_devices, ARRAY_SIZE(mini2440_devices));   
+  
+        ...   
+        ...   
+}  
+ 
+static struct platform_device *mini2440_devices[] __initdata = {   
+    &s3c_device_usb,   
+    &s3c_device_wdt,   
+/*  &s3c_device_adc,*/ /* ADC doesn't like living with touchscreen ! */  
+    &s3c_device_i2c0,   
+    &s3c_device_rtc,   
+    &s3c_device_usbgadget,   
+    &mini2440_device_eth, /*dm9000是众多平台设备中的一个*/  
+    &mini2440_led1,   
+    &mini2440_led2,   
+    &mini2440_led3,   
+    &mini2440_led4,   
+    &mini2440_button_device,   
+    &s3c_device_nand,   
+    &s3c_device_sdi,   
+    &s3c_device_iis,   
+    &mini2440_audio,   
+/*  &s3c_device_timer[0],*/ /* buzzer pwm, no API for it */  
+    /* remaining devices are optional */  
+};  
+  
+二、两个重要的结构体简单介绍：sk_buff和net_device
+
+   *sk_buff
+
+    如果把网络传输看成是运送货物的话，那么sk_buff就是这个“货物”了，所有经手这个货物的人都要干点什么事儿，要么加个包装，要么印个戳儿等等。收货的时候就要拆掉这些包装，得到我们需要的货物（payload data）。没有货物你还运输什么呢？由此可见sk_buff的重要性了。关于sk_buff的详细介绍和几个操作它的函数，参考：“linux内核sk_buff的结构分析” http://www.linuxidc.com/Linux/2011-07/39163.htm，写得非常明白了。赞一个~
+
+  *net_device
+
+    又是一个庞大的结构体。好吧，我承认我从来就没有看全过这个结构体。它在内核中就是指代了一个网络设备。驱动程序需要在探测的时候分配并初始化这个结构体，然后使用register_netdev来注册它，这样就可以把操作硬件的函数与内核挂接在一起。
+	
+三、具体代码的分析
+   在顺序分析之前先看三个结构体变量和一个自定义的结构体。
+
+   * dm9000_driver变量。是platform_driver结构体变量，其中包含了重要的：驱动的名字（用来match）和几个重要操作函数。
+
+ 
+static struct platform_driver dm9000_driver = {   
+    .driver = {   
+        .name    = "dm9000",   
+        .owner   = THIS_MODULE,   
+    },   
+    .probe   = dm9000_probe,   
+    .remove  = __devexit_p(dm9000_drv_remove),   
+    .suspend = dm9000_drv_suspend,   
+    .resume  = dm9000_drv_resume,   
+};  
+  
+
+  * dm9000_netdev_ops变量。是net_device_ops结构体变量， 其中定义了操作net_device的重要函数，我们在驱动程序中根据需要的操作要填充这些函数。代码清单如下：
+
+ 
+static const struct net_device_ops dm9000_netdev_ops = {   
+    .ndo_open       = dm9000_open,   
+    .ndo_stop       = dm9000_stop,   
+    .ndo_start_xmit     = dm9000_start_xmit,   
+    .ndo_tx_timeout     = dm9000_timeout,   
+    .ndo_set_multicast_list = dm9000_hash_table,   
+    .ndo_do_ioctl       = dm9000_ioctl,   
+    .ndo_change_mtu     = eth_change_mtu,   
+    .ndo_validate_addr  = eth_validate_addr,   
+    .ndo_set_mac_address    = eth_mac_addr,  
+#ifdef CONFIG_NET_POLL_CONTROLLER   
+    .ndo_poll_controller    = dm9000_poll_controller,  
+#endif   
+};  
+   * dm9000_ethtool_ops变量。是ethtool_ops结构体变量，为了支持ethtool，其中的函数主要是用于查询和设置网卡参数（当然也有的驱动程序可能不支持ethtool）。代码清单如下：
+
+ 
+static const struct ethtool_ops dm9000_ethtool_ops = {   
+    .get_drvinfo        = dm9000_get_drvinfo,   
+    .get_settings       = dm9000_get_settings,   
+    .set_settings       = dm9000_set_settings,   
+    .get_msglevel       = dm9000_get_msglevel,   
+    .set_msglevel       = dm9000_set_msglevel,   
+    .nway_reset     = dm9000_nway_reset,   
+    .get_link       = dm9000_get_link,   
+    .get_eeprom_len     = dm9000_get_eeprom_len,   
+    .get_eeprom     = dm9000_get_eeprom,   
+    .set_eeprom     = dm9000_set_eeprom,   
+};  
+   * board_info结构体。用来保存芯片相关的一些私有信息。具体在代码中分析。下面是这个结构体的清单。
+
+ 
+/* Structure/enum declaration ------------------------------- */  
+typedef struct board_info {   
+  
+    void __iomem    *io_addr;   /* Register I/O base address */  
+    void __iomem    *io_data;   /* Data I/O address */  
+    u16      irq;       /* IRQ */  
+  
+    u16     tx_pkt_cnt;   
+    u16     queue_pkt_len;   
+    u16     queue_start_addr;   
+    u16     dbug_cnt;   
+    u8      io_mode;        /* 0:word, 2:byte */  
+    u8      phy_addr;   
+    u8      imr_all;   
+  
+    unsigned int    flags;   
+    unsigned int    in_suspend :1;   
+    int     debug_level;   
+  
+    enum dm9000_type type;   
+  
+    void (*inblk)(void __iomem *port, void *data, int length);   
+    void (*outblk)(void __iomem *port, void *data, int length);   
+    void (*dumpblk)(void __iomem *port, int length);   
+  
+    struct device   *dev;        /* parent device */  
+  
+    struct resource *addr_res;   /* resources found */  
+    struct resource *data_res;   
+    struct resource *addr_req;   /* resources requested */  
+    struct resource *data_req;   
+    struct resource *irq_res;   
+  
+    struct mutex     addr_lock; /* phy and eeprom access lock */  
+  
+    struct delayed_work phy_poll;   
+    struct net_device  *ndev;   
+  
+    spinlock_t  lock;   
+  
+    struct mii_if_info mii;   
+    u32     msg_enable;   
+} board_info_t;  
+
+下面看一下具体代码。
+
+分析代码还是从init顺序开始。
+
+     1. 注册平台驱动。
+
+    主要完成的任务是：将驱动添加到总线上，完成驱动和设备的match，并执行驱动的probe函数。代码清单如下：
+
+ 
+static struct platform_driver dm9000_driver = {   
+    .driver = {   
+        .name    = "dm9000", /*用这个名字完成驱动和设备的match*/  
+        .owner   = THIS_MODULE,   
+    },   
+    .probe   = dm9000_probe,   
+    .remove  = __devexit_p(dm9000_drv_remove),   
+    .suspend = dm9000_drv_suspend,   
+    .resume  = dm9000_drv_resume,   
+};   
+  
+static int __init   
+dm9000_init(void)   
+{   
+    printk(KERN_INFO "%s Ethernet Driver, V%s\n", CARDNAME, DRV_VERSION);   
+  
+    return platform_driver_register(&dm9000_driver);   
+}  
+    2. probe函数。
+
+   主要完成的任务是：探测设备获得并保存资源信息，根据这些信息申请内存和中断，最后调用register_netdev注册这个网络设备。以下是代码清单，可以分成几个部分来看：
+
+   1) 首先定义了几个局部变量：
+
+         struct dm9000_plat_data *pdata = pdev->dev.platform_data;
+         struct board_info *db; /* Point a board information structure */
+         struct net_device *ndev;
+
+   2) 初始化一个网络设备。关键系统函数：alloc_etherdev()
+
+   3) 获得资源信息并将其保存在board_info变量db中。关键系统函数：netdev_priv(),  platform_get_resource()
+
+   4) 根据资源信息分配内存，申请中断等等, 并将申请后的资源信息也保存到db中，并且填充ndev中的参数。 关键系统函数：request_mem_region(),  ioremap()。 自定义函数:dm9000_set_io()
+
+   5) 完成了第4步以后，回顾一下db和ndev中都有了什么：
+
+       struct board_info *db:
+
+                 addr_res -- 地址资源
+
+                 data_res -- 数据资源
+
+                 irq_res    -- 中断资源
+
+                 addr_req -- 分配的地址内存资源
+
+                 io_addr   -- 寄存器I/O基地址
+
+                 data_req -- 分配的数据内存资源
+
+                 io_data   -- 数据I/O基地址
+
+                 dumpblk  -- IO模式
+
+                 outblk     -- IO模式
+
+                 inblk        -- IO模式
+
+                 lock         -- 自旋锁（已经被初始化）
+
+                 addr_lock -- 互斥锁（已经被初始化）
+
+        struct net_device *ndev：
+
+                 base_addr  -- 设备IO地址
+
+                 irq              -- 设备IRQ号
+
+     6) 设备复位。硬件操作函数dm9000_reset()
+
+     7) 读一下生产商和制造商的ID，应该是0x9000 0A46。 关键函数：ior()
+
+     8) 读一下芯片类型。
+
+     ========以上步骤结束后我们可以认为已经找到了DM9000========
+
+     9) 借助ether_setup()函数来部分初始化ndev。因为对以太网设备来讲，很多操作与属性是固定的，内核可以帮助完成。
+
+    10) 手动初始化ndev的ops和db的mii部分。
+
+    11) （如果有的话）从EEPROM中读取节点地址。这里可以看到mini2440这个板子上没有为DM9000外挂EEPROM，所以读取出来的全部是0xff。见函数dm9000_read_eeprom。 关于外挂EEPROM，可以参考datasheet上的7.EEPROM Format一节。
+
+    12)  很显然ndev是我们在probe函数中定义的局部变量，如果我想在其他地方使用它怎么办呢？ 这就需要把它保存起来。内核提供了这个方法，使用函数platform_set_drvdata()可以将ndev保存成平台总线设备的私有数据。以后再要使用它时只需调用platform_get_drvdata()就可以了。
+	13) 使用register_netdev()注册ndev。
+下面是代码清单：
+
+ 
+static int __devinit   
+dm9000_probe(struct platform_device *pdev)   
+{   
+    struct dm9000_plat_data *pdata = pdev->dev.platform_data;   
+    struct board_info *db;  /* Point a board information structure */  
+    struct net_device *ndev;   
+    const unsigned char *mac_src;   
+    int ret = 0;   
+    int iosize;   
+    int i;   
+    u32 id_val;   
+  
+    /* Init network device */  
+        /*使用alloc_etherdev()来生成一个net_device结构体，并对其公有成员赋值*/  
+    ndev = alloc_etherdev(sizeof(struct board_info));   
+    if (!ndev) {   
+        dev_err(&pdev->dev, "could not allocate device.\n");   
+        return -ENOMEM;   
+    }   
+  
+    SET_NETDEV_DEV(ndev, &pdev->dev);   
+  
+    dev_dbg(&pdev->dev, "dm9000_probe()\n");   
+  
+    /* setup board info structure */  
+    db = netdev_priv(ndev);   
+    memset(db, 0, sizeof(*db));   
+  
+    db->dev = &pdev->dev;   
+    db->ndev = ndev;   
+  
+    spin_lock_init(&db->lock);   
+    mutex_init(&db->addr_lock);   
+  
+    INIT_DELAYED_WORK(&db->phy_poll, dm9000_poll_work);   
+  
+    db->addr_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);   
+    db->data_res = platform_get_resource(pdev, IORESOURCE_MEM, 1);   
+    db->irq_res  = platform_get_resource(pdev, IORESOURCE_IRQ, 0);   
+  
+    if (db->addr_res == NULL || db->data_res == NULL ||   
+        db->irq_res == NULL) {   
+        dev_err(db->dev, "insufficient resources\n");   
+        ret = -ENOENT;   
+        goto out;   
+    }   
+  
+    iosize = res_size(db->addr_res);   
+    db->addr_req = request_mem_region(db->addr_res->start, iosize,   
+                      pdev->name);   
+  
+    if (db->addr_req == NULL) {   
+        dev_err(db->dev, "cannot claim address reg area\n");   
+        ret = -EIO;   
+        goto out;   
+    }   
+  
+    db->io_addr = ioremap(db->addr_res->start, iosize);   
+  
+    if (db->io_addr == NULL) {   
+        dev_err(db->dev, "failed to ioremap address reg\n");   
+        ret = -EINVAL;   
+        goto out;   
+    }   
+  
+    iosize = res_size(db->data_res);   
+    db->data_req = request_mem_region(db->data_res->start, iosize,   
+                      pdev->name);   
+  
+    if (db->data_req == NULL) {   
+        dev_err(db->dev, "cannot claim data reg area\n");   
+        ret = -EIO;   
+        goto out;   
+    }   
+  
+    db->io_data = ioremap(db->data_res->start, iosize);   
+  
+    if (db->io_data == NULL) {   
+        dev_err(db->dev, "failed to ioremap data reg\n");   
+        ret = -EINVAL;   
+        goto out;   
+    }   
+  
+    /* fill in parameters for net-dev structure */  
+    ndev->base_addr = (unsigned long)db->io_addr;   
+    ndev->irq    = db->irq_res->start;   
+  
+    /* ensure at least we have a default set of IO routines */  
+    dm9000_set_io(db, iosize);   
+  
+    /* check to see if anything is being over-ridden */  
+    if (pdata != NULL) {   
+        /* check to see if the driver wants to over-ride the  
+         * default IO width */  
+  
+        if (pdata->flags & DM9000_PLATF_8BITONLY)   
+            dm9000_set_io(db, 1);   
+  
+        if (pdata->flags & DM9000_PLATF_16BITONLY)   
+            dm9000_set_io(db, 2);   
+  
+        if (pdata->flags & DM9000_PLATF_32BITONLY)   
+            dm9000_set_io(db, 4);   
+  
+        /* check to see if there are any IO routine  
+         * over-rides */  
+  
+        if (pdata->inblk != NULL)   
+            db->inblk = pdata->inblk;   
+  
+        if (pdata->outblk != NULL)   
+            db->outblk = pdata->outblk;   
+  
+        if (pdata->dumpblk != NULL)   
+            db->dumpblk = pdata->dumpblk;   
+  
+        db->flags = pdata->flags;   
+    }  
+ 
+#ifdef CONFIG_DM9000_FORCE_SIMPLE_PHY_POLL   
+    db->flags |= DM9000_PLATF_SIMPLE_PHY;  
+#endif   
+  
+    dm9000_reset(db);   
+  
+    /* try multiple times, DM9000 sometimes gets the read wrong */  
+    for (i = 0; i < 8; i++) {   
+        id_val  = ior(db, DM9000_VIDL);   
+        id_val |= (u32)ior(db, DM9000_VIDH) << 8;   
+        id_val |= (u32)ior(db, DM9000_PIDL) << 16;   
+        id_val |= (u32)ior(db, DM9000_PIDH) << 24;   
+  
+        if (id_val == DM9000_ID)   
+            break;   
+        dev_err(db->dev, "read wrong id 0x%08x\n", id_val);   
+    }   
+  
+    if (id_val != DM9000_ID) {   
+        dev_err(db->dev, "wrong id: 0x%08x\n", id_val);   
+        ret = -ENODEV;   
+        goto out;   
+    }   
+  
+    /* Identify what type of DM9000 we are working on */  
+  
+    id_val = ior(db, DM9000_CHIPR);   
+    dev_dbg(db->dev, "dm9000 revision 0x%02x\n", id_val);   
+  
+    switch (id_val) {   
+    case CHIPR_DM9000A:   
+        db->type = TYPE_DM9000A;   
+        break;   
+    case CHIPR_DM9000B:   
+        db->type = TYPE_DM9000B;   
+        break;   
+    default:   
+        dev_dbg(db->dev, "ID %02x => defaulting to DM9000E\n", id_val);   
+        db->type = TYPE_DM9000E;   
+    }   
+  
+    /* from this point we assume that we have found a DM9000 */  
+  
+    /* driver system function */  
+    ether_setup(ndev);   
+  
+    ndev->netdev_ops = &dm9000_netdev_ops;   
+    ndev->watchdog_timeo = msecs_to_jiffies(watchdog);   
+    ndev->ethtool_ops    = &dm9000_ethtool_ops;   
+  
+    db->msg_enable       = NETIF_MSG_LINK;   
+    db->mii.phy_id_mask  = 0x1f;   
+    db->mii.reg_num_mask = 0x1f;   
+    db->mii.force_media  = 0;   
+    db->mii.full_duplex  = 0;   
+    db->mii.dev       = ndev;   
+    db->mii.mdio_read    = dm9000_phy_read;   
+    db->mii.mdio_write   = dm9000_phy_write;   
+  
+    mac_src = "eeprom";   
+  
+    /* try reading the node address from the attached EEPROM */  
+    for (i = 0; i < 6; i += 2)   
+        dm9000_read_eeprom(db, i / 2, ndev->dev_addr+i);   
+  
+    if (!is_valid_ether_addr(ndev->dev_addr) && pdata != NULL) {   
+        mac_src = "platform data";   
+        memcpy(ndev->dev_addr, pdata->dev_addr, 6);   
+    }   
+  
+    if (!is_valid_ether_addr(ndev->dev_addr)) {   
+        /* try reading from mac */  
+           
+        mac_src = "chip";   
+        for (i = 0; i < 6; i++)   
+            ndev->dev_addr[i] = ior(db, i+DM9000_PAR);   
+    }   
+  
+    if (!is_valid_ether_addr(ndev->dev_addr))   
+        dev_warn(db->dev, "%s: Invalid ethernet MAC address. Please "  
+             "set using ifconfig\n", ndev->name);   
+  
+    platform_set_drvdata(pdev, ndev);   
+    ret = register_netdev(ndev);   
+  
+    if (ret == 0)   
+        printk(KERN_INFO "%s: dm9000%c at %p,%p IRQ %d MAC: %pM (%s)\n",   
+               ndev->name, dm9000_type_to_char(db->type),   
+               db->io_addr, db->io_data, ndev->irq,   
+               ndev->dev_addr, mac_src);   
+    return 0;   
+  
+out:   
+    dev_err(db->dev, "not found (%d).\n", ret);   
+  
+    dm9000_release_board(pdev, db);   
+    free_netdev(ndev);   
+  
+    return ret;   
+}  
+3. platform_driver的remove， suspend和resume的实现
+        remove函数的功能是把设备从内核中移除，释放内存区域。该函数在卸载模块时被调用。代码清单如下：
+
+ 
+static int __devexit   
+dm9000_drv_remove(struct platform_device *pdev)   
+{   
+    struct net_device *ndev = platform_get_drvdata(pdev);   
+  
+    platform_set_drvdata(pdev, NULL);   
+  
+    unregister_netdev(ndev);   
+    dm9000_release_board(pdev, (board_info_t *) netdev_priv(ndev));   
+    free_netdev(ndev);      /* free device structure */  
+  
+    dev_dbg(&pdev->dev, "released and freed device\n");   
+    return 0;   
+}  
+        suspend函数并不真正把设备从内核中移除，而只是标志设备为removed状态，并设置挂起标志位，最后关闭设备。代码清单如下：
+
+ 
+static int  
+dm9000_drv_suspend(struct platform_device *dev, pm_message_t state)   
+{   
+    struct net_device *ndev = platform_get_drvdata(dev);   
+    board_info_t *db;   
+  
+    if (ndev) {   
+        db = netdev_priv(ndev);   
+        db->in_suspend = 1;   
+  
+        if (netif_running(ndev)) {   
+            netif_device_detach(ndev);   
+            dm9000_shutdown(ndev);   
+        }   
+    }   
+    return 0;   
+}  
+      resume函数将挂起的设备复位并初始化，软后将设备标志为attached状态，并设置挂起标志位。代码清单如下：
+
+ 
+static int  
+dm9000_drv_resume(struct platform_device *dev)   
+{   
+    struct net_device *ndev = platform_get_drvdata(dev);   
+    board_info_t *db = netdev_priv(ndev);   
+  
+    if (ndev) {   
+  
+        if (netif_running(ndev)) {   
+            dm9000_reset(db);   
+            dm9000_init_dm9000(ndev);   
+  
+            netif_device_attach(ndev);   
+        }   
+  
+        db->in_suspend = 0;   
+    }   
+    return 0;   
+}  
+
+4. 下面看一下用于填充net_device中netdev_ops和ethtool_ops的一些函数。
+    代码在上面已经写出来了，为了看着方便在下面再写一遍，可以看出虽然mini2440的板子上没有为DM9000挂EEPROM，但这里还是定义了操作EEPROM的函数。就是说写驱动的时候是不考虑具体的板子的，你板子用不用是你的事，但是我们的驱动应该所有的功能都考虑进去。这也体现了驱动和平台分离的设计思想。
+
+ 
+static const struct net_device_ops dm9000_netdev_ops = {   
+    .ndo_open       = dm9000_open,   
+    .ndo_stop       = dm9000_stop,   
+    .ndo_start_xmit     = dm9000_start_xmit,   
+    .ndo_tx_timeout     = dm9000_timeout,   
+    .ndo_set_multicast_list = dm9000_hash_table,   
+    .ndo_do_ioctl       = dm9000_ioctl,   
+    .ndo_change_mtu     = eth_change_mtu,   
+    .ndo_validate_addr  = eth_validate_addr,   
+    .ndo_set_mac_address    = eth_mac_addr,  
+#ifdef CONFIG_NET_POLL_CONTROLLER   
+    .ndo_poll_controller    = dm9000_poll_controller,  
+#endif   
+};  
+ 
+static const struct ethtool_ops dm9000_ethtool_ops = {   
+    .get_drvinfo        = dm9000_get_drvinfo,   
+    .get_settings       = dm9000_get_settings,   
+    .set_settings       = dm9000_set_settings,   
+    .get_msglevel       = dm9000_get_msglevel,   
+    .set_msglevel       = dm9000_set_msglevel,   
+    .nway_reset     = dm9000_nway_reset,   
+    .get_link       = dm9000_get_link,   
+    .get_eeprom_len     = dm9000_get_eeprom_len,   
+    .get_eeprom     = dm9000_get_eeprom,   
+    .set_eeprom     = dm9000_set_eeprom,   
+};  
+  
+
+    *dm9000_open()
+
+    进行的工作有 向内核注册中断，复位并初始化dm9000，检查MII接口，使能传输等。代码清单如下：
+
+ 
+/*  
+ *  Open the interface.  
+ *  The interface is opened whenever "ifconfig" actives it.  
+ */  
+static int  
+dm9000_open(struct net_device *dev)   
+{   
+    board_info_t *db = netdev_priv(dev);   
+    unsigned long irqflags = db->irq_res->flags & IRQF_TRIGGER_MASK;   
+  
+    if (netif_msg_ifup(db))   
+        dev_dbg(db->dev, "enabling %s\n", dev->name);   
+  
+    /* If there is no IRQ type specified, default to something that  
+     * may work, and tell the user that this is a problem */  
+  
+    if (irqflags == IRQF_TRIGGER_NONE)   
+        dev_warn(db->dev, "WARNING: no IRQ resource flags set.\n");   
+  
+    irqflags |= IRQF_SHARED;   
+  
+    if (request_irq(dev->irq, &dm9000_interrupt, irqflags, dev->name, dev))/*注册一个中断，中断处理函数为dm9000_interrupt()*/  
+        return -EAGAIN;   
+  
+    /* Initialize DM9000 board */  
+    dm9000_reset(db);   
+    dm9000_init_dm9000(dev);   
+  
+    /* Init driver variable */  
+    db->dbug_cnt = 0;   
+  
+    mii_check_media(&db->mii, netif_msg_link(db), 1);   
+    netif_start_queue(dev);   
+       
+    dm9000_schedule_poll(db);/*之前在probe函数中已经使用INIT_DELAYED_WORK来初始化一个延迟工作队列并关联了一个操作函数dm9000_poll_work()， 此时运行schedule来调用这个函数*/  
+  
+    return 0;   
+}  
+
+*dm9000_stop()
+     做的工作基本上和open相反。代码清单如下：
+
+/*  
+ * Stop the interface.  
+ * The interface is stopped when it is brought.  
+ */  
+static int  
+dm9000_stop(struct net_device *ndev)   
+{   
+    board_info_t *db = netdev_priv(ndev);   
+  
+    if (netif_msg_ifdown(db))   
+        dev_dbg(db->dev, "shutting down %s\n", ndev->name);   
+  
+    cancel_delayed_work_sync(&db->phy_poll); /*杀死延迟工作队列phy_poll*/  
+  
+        /*停止传输并清空carrier*/  
+    netif_stop_queue(ndev);   
+    netif_carrier_off(ndev);   
+  
+    /* free interrupt */  
+    free_irq(ndev->irq, ndev);   
+  
+    dm9000_shutdown(ndev);   
+  
+    return 0;   
+}  
+    *dm9000_start_xmit()
+
+    重要的发送数据包函数。从上层发送sk_buff包。在看代码之前先来看一下DM9000是如何发送数据包的。
+
+    
+
+如上图所示，在DM9000内部SRAM中，地址0x0000~0x0BFF是TX Buffer， 地址0x0C00~0x3FFF是RX Buffer。在发送一个包之前，包中的有效数据必须先被存储到TX Buffer中并且使用输出端口命令来选择MWCMD寄存器。包的长度定义在TXPLL和TXPLH中。最后设置TXCR寄存器的bit[0] TXREQ来自动发送包。如果设置了IMR寄存器的PTM位，则DM9000会产生一个中断触发在ISR寄存器的bit[1]=PTS=1, 同时设置一个完成标志在NSR寄存器的bit[2]=TX1END或者 bit[3]=TX2END，表示包已经发送完了。发送一个包的具体步骤如下：
+
+Step 1： 检查存储数据宽度。通过读取中断状态寄存器（ISR）的bit[7:6]来确定是8bit，16bit还是32bit。
+
+Step 2： 写数据到TX SRAM中。
+
+Step 3： 写传输长度到TXPLL和TXPLH寄存器中。
+
+Step 4： 设置TXCR寄存器的bit[0]TXREQ来开始发送一个包。
+
+代码清单如下，让我们看看在获得自旋锁这段期间都干了些什么：
+
+ 
+/*  
+ *  Hardware start transmission.  
+ *  Send a packet to media from the upper layer.  
+ */  
+static int  
+dm9000_start_xmit(struct sk_buff *skb, struct net_device *dev)   
+{   
+    unsigned long flags;   
+    board_info_t *db = netdev_priv(dev);   
+  
+    dm9000_dbg(db, 3, "%s:\n", __func__);   
+  
+    if (db->tx_pkt_cnt > 1)   
+        return NETDEV_TX_BUSY;   
+  
+        /*获得自旋锁*/  
+    spin_lock_irqsave(&db->lock, flags);    
+  
+    /* Move data to DM9000 TX RAM */  
+        /*下面四行代码将skb中的data部分写入DM9000的TX RAM，并更新已发送字节数和发送计数*/  
+    writeb(DM9000_MWCMD, db->io_addr);   
+  
+    (db->outblk)(db->io_data, skb->data, skb->len);   
+    dev->stats.tx_bytes += skb->len;   
+  
+    db->tx_pkt_cnt++;   
+    /* TX control: First packet immediately send, second packet queue */  
+        /*如果发送的是第一个包，则设置一下包的长度后直接发送*/  
+        /*如果发的不是第一个包，*/  
+    if (db->tx_pkt_cnt == 1) {   
+        /* Set TX length to DM9000 */  
+        iow(db, DM9000_TXPLL, skb->len);   
+        iow(db, DM9000_TXPLH, skb->len >> 8);   
+  
+        /* Issue TX polling command */  
+        iow(db, DM9000_TCR, TCR_TXREQ); /* Cleared after TX complete */  
+  
+        dev->trans_start = jiffies;  /* save the time stamp */  
+    } else {   
+        /* Second packet */  
+                /*如果发送的是第二个数据包（表明队列中此时有包发送），则将其加入队列中：将skb->len和skb->ip_summed（控制校验操作）赋值给board_info_t中有关队列的相关成员。调用函数netif_stop_queue(dev)，通知���核现在queue已满，不能再将发送数据传到队列中，注：第二个包的发送将在tx_done中实现。*/  
+        db->queue_pkt_len = skb->len;   
+        netif_stop_queue(dev);   
+    }   
+  
+        /*释放自旋锁*/  
+    spin_unlock_irqrestore(&db->lock, flags);   
+  
+    /* free this SKB */  
+    dev_kfree_skb(skb);   
+  
+    return 0;   
+}  
+
+*dm9000_timeout()
+    当watchdog超时时调用该函数。主要的功能是保存寄存器地址，停止队列，重启并初始化DM9000，唤醒队列，恢复寄存器地址。
+
+    代码清单如下：
+
+/* Our watchdog timed out. Called by the networking layer */  
+static void dm9000_timeout(struct net_device *dev)   
+{   
+    board_info_t *db = netdev_priv(dev);   
+    u8 reg_save;   
+    unsigned long flags;   
+  
+    /* Save previous register address */  
+    reg_save = readb(db->io_addr);   
+    spin_lock_irqsave(&db->lock, flags);   
+  
+    netif_stop_queue(dev);   
+    dm9000_reset(db);   
+    dm9000_init_dm9000(dev);   
+    /* We can accept TX packets again */  
+    dev->trans_start = jiffies;   
+    netif_wake_queue(dev);   
+  
+    /* Restore previous register address */  
+    writeb(reg_save, db->io_addr);   
+    spin_unlock_irqrestore(&db->lock, flags);   
+}  
+    *dm9000_hash_table()
+
+    该函数用来设置DM9000的组播地址。代码清单如下：
+
+/*  
+ *  Set DM9000 multicast address  
+ */  
+static void  
+dm9000_hash_table(struct net_device *dev)   
+{   
+    board_info_t *db = netdev_priv(dev);   
+    struct dev_mc_list *mcptr = dev->mc_list;   
+    int mc_cnt = dev->mc_count;   
+    int i, oft;   
+    u32 hash_val;   
+    u16 hash_table[4];   
+    u8 rcr = RCR_DIS_LONG | RCR_DIS_CRC | RCR_RXEN;   
+    unsigned long flags;   
+  
+    dm9000_dbg(db, 1, "entering %s\n", __func__);   
+  
+    spin_lock_irqsave(&db->lock, flags);   
+  
+    for (i = 0, oft = DM9000_PAR; i < 6; i++, oft++)   
+        iow(db, oft, dev->dev_addr[i]);   
+  
+    /* Clear Hash Table */  
+    for (i = 0; i < 4; i++)   
+        hash_table[i] = 0x0;   
+  
+    /* broadcast address */  
+    hash_table[3] = 0x8000;   
+  
+    if (dev->flags & IFF_PROMISC)   
+        rcr |= RCR_PRMSC;   
+  
+    if (dev->flags & IFF_ALLMULTI)   
+        rcr |= RCR_ALL;   
+  
+    /* the multicast address in Hash Table : 64 bits */  
+    for (i = 0; i < mc_cnt; i++, mcptr = mcptr->next) {   
+        hash_val = ether_crc_le(6, mcptr->dmi_addr) & 0x3f;   
+        hash_table[hash_val / 16] |= (u16) 1 << (hash_val % 16);   
+    }   
+  
+    /* Write the hash table to MAC MD table */  
+    for (i = 0, oft = DM9000_MAR; i < 4; i++) {   
+        iow(db, oft++, hash_table[i]);   
+        iow(db, oft++, hash_table[i] >> 8);   
+    }   
+  
+    iow(db, DM9000_RCR, rcr);   
+    spin_unlock_irqrestore(&db->lock, flags);   
+}  
+    *dm9000_ioctl()
+
+    从源码可以看出，dm9000的ioctl实际上是使用了mii的ioctl。代码清单如下：
+
+static int dm9000_ioctl(struct net_device *dev, struct ifreq *req, int cmd)   
+{   
+    board_info_t *dm = to_dm9000_board(dev);   
+  
+    if (!netif_running(dev))   
+        return -EINVAL;   
+  
+    return generic_mii_ioctl(&dm->mii, if_mii(req), cmd, NULL);   
+}  
+    *dm9000_poll_controller()
+
+    当内核配置Netconsole时该函数生效。代码清单如下：
+
+#ifdef CONFIG_NET_POLL_CONTROLLER   
+/*  
+ *Used by netconsole  
+ */  
+static void dm9000_poll_controller(struct net_device *dev)   
+{   
+    disable_irq(dev->irq);   
+    dm9000_interrupt(dev->irq, dev);   
+    enable_irq(dev->irq);   
+}  
+#endif  
+*dm9000_get_drvinfo()
+
+    该函数去的设备的基本信息(设备名，版本，总线名)传给ethtool_drvinfo结构体变量。代码清单如下：
+
+ 
+static void dm9000_get_drvinfo(struct net_device *dev,   
+                   struct ethtool_drvinfo *info)   
+{   
+    board_info_t *dm = to_dm9000_board(dev); /*to_dm9000_board实际上就是调用了netdev_priv(dev)*/  
+  
+    strcpy(info->driver, CARDNAME);   
+    strcpy(info->version, DRV_VERSION);   
+    strcpy(info->bus_info, to_platform_device(dm->dev)->name);   
+}  
+    *dm9000_get_settings()
+
+    该函数得到由参数cmd指定的设置信息。
+
+    *dm9000_set_settings()
+
+    该函数设置由参数cmd指定的信息。
+
+    *dm9000_get_msglevel()
+
+    *dm9000_set_msglevel()
+
+    这两个函数设置和取得message level，实际是设置和取得board_info中的msg_enable信息。
+
+    *dm9000_nway_reset()
+
+    重启mii的自动协商
+
+    *dm9000_get_link()
+
+    该函数的到link状态。如果带外部PHY，则返回mii链接状态。 否则返回DM9000 NSR寄存器数值。
+
+    *dm9000_get_eeprom_len()
+      dm9000_get_eeprom()
+      dm9000_set_eeprom()
+
+    这三个函数用来读写eeprom。
+	5. 与数据传输有关的函数。
+
+     上面已经分析了一个与数据传输有关的函数，那就是发送数据的函数dm9000_start_xmit()。这里再来分析数据的接收。再看具体代码之前还是来看看DM9000的数据接收的过程。
+
+      接收的数据存储在RX SRAM中，地址是0C00h~3FFFh。存储在RX_SRAM中的每个包都有4个字节的信息头。可以使用MRCMDX和MRCMD寄存器来得到这些信息。第一个字节用来检查数据包是否接收到了RX_SRAM中，如果这个字节是"01"，意味着一个包已经接收。如果是"00"，则还没有数据包被接收到RX_SRAM中。第二个字节保存接收到的数据包的信息，格式和RSR寄存器一样。根据这个格式，接收到的包能被校验是正确的还是错误的包。第三和第四字节保存了接收的数据包的长度。这四个字节以外的其他字节就是接收包的数据。看下图可以更好的理解这种格式。
+
+
+
+根据包的结构可以知道接收一个包应该按照下面的步骤来进行：
+
+第一步：判断包是否已经接收过来了。需要用到MRCMDX寄存器。MRCMDX寄存器是存储数据读命令寄存器（地址不增加）。 这个寄存器只是用来读接收包标志位"01"。下面这段代码是一个例子，用来判断RX ready：
+
+u8 RX_ready = ior( IOaddr, 0xF0 );         /* dummy read the packet ready flag */  
+RX_ready = (u8) inp( IOaddr + 4 );         /* got the most updated data */  
+if ( RX_ready == 1 ) {                     /* ready check: this byte must be 0 or 1 */  
+       /* check the RX status and to get RX length (see datasheet ch.5.6.3) */  
+       /* income RX a packet (see datasheet ch.5.6.4) */  
+} else if ( RX_ready != 0 ) {              /* stop device and wait to reset device */  
+       iow( IOaddr, 0xFF, 0x80 );          /* stop INT request */  
+       iow( IOaddr, 0xFE, 0x0F );          /* clear ISR status */  
+       iow( IOaddr, 0x05, 0x00 );          /* stop RX function */  
+       u8 device_wait_reset = TRUE;        /* raise the reset flag */  
+}  
+ 第二步：检查包的状态和长度。需要用到MRCMD寄存器（存储数据读命令，读指针自动增加）。下面这段例子代码用来读RX状态和长度。
+
+u8 io_mode = ior( IOaddr, 0xFE ) >> 6; /* ISR bit[7:6] keep I/O mode */  
+outp( IOaddr, 0xF2 );                /* trigger MRCMD reg_F2h with read_ptr++ */  
+/* int RX_status : the RX packet status, int RX_length : the RX packet length */  
+if ( io_mode == 2 ) {                /* I/O byte mode */  
+RX_status = inp( IOaddr + 4 ) + ( inp( IOaddr + 4 ) << 8 );   
+RX_length = inp( IOaddr + 4 ) + ( inp( IOaddr + 4 ) << 8 );        }   
+else if ( io_mode == 0 ) {           /* I/O word mode */  
+RX_status = inpw( IOaddr + 4 );   
+RX_length = inpw( IOaddr + 4 );             }   
+else if ( io_mode == 1 ) {           /* I/O dword mode */  
+(u32) status_tmp = inpl( IOaddr + 4 );           /* got the RX 32-bit dword data */  
+RX_status = (u16)( status_tmp & 0xFFFF );   
+RX_length = (u16)( ( status_tmp >> 16 ) & 0xFFFF );          }  
+第三步：读包的数据。也需要MRCMD寄存器。例子代码如下：
+
+/* u8 RX_data[] : the data of the received packet */  
+if ( io_mode == 2 ) {                 /* I/O byte mode */  
+for ( i = 0 ; i < RX_length ; i++ ) /* loop to read a byte data from RX SRAM */  
+  RX_data[ i ] = (u8) inp( IOaddr + 4 );          }   
+else if ( io_mode == 0 ) {            /* I/O word mode */  
+int length_tmp = ( RX_length + 1 ) / 2;   
+for ( i = 0 ; i < length_tmp ; i++ ) /* loop to read a word data from RX SRAM */  
+ ( (u16 *)RX_data)[ i ] = inpw( IOaddr + 4 );           }   
+else if ( io_mode == 1 ) {            /* I/O dword mode */  
+int length_tmp = ( RX_length + 3 ) / 4;   
+for ( i = 0 ; i < length_tmp ; i++ ) /* loop to read a dword data from RX SRAM */  
+ ( (u32 *)RX_data)[ i ] = inpl( IOaddr + 4 ); }         /* inpl() is inport 32-bit I/O */  
+下面的dm9000_rx()函数实际上是按照上面这三个步骤来实现的，具体实现并不一定是要参照例子代码。 注意这里按照DM9000接收包的格式定义了一个结构体dm9000_rxhdr用来表示头部的四个字节。代码清单如下：
+
+struct dm9000_rxhdr {   
+    u8  RxPktReady;   
+    u8  RxStatus;   
+    __le16  RxLen;   
+} __attribute__((__packed__));  
+接收函数代码如下：
+
+/*  
+ *  Received a packet and pass to upper layer  
+ */  
+static void  
+dm9000_rx(struct net_device *dev)   
+{   
+    board_info_t *db = netdev_priv(dev);   
+    struct dm9000_rxhdr rxhdr;   
+    struct sk_buff *skb;   
+    u8 rxbyte, *rdptr;   
+    bool GoodPacket;   
+    int RxLen;   
+  
+    /* Check packet ready or not */  
+    do {   
+        ior(db, DM9000_MRCMDX); /* Dummy read */  
+  
+        /* Get most updated data */  
+                /*读一下最新数据的第一个字节*/  
+        rxbyte = readb(db->io_data);   
+  
+        /* Status check: this byte must be 0 or 1 */  
+                /*DM9000_PKT_RDY定义是0x01，如果第一个字节大于0x01，则不是正确的状态。因为第一个字节只能是01h或00h*/  
+        if (rxbyte > DM9000_PKT_RDY) {   
+            dev_warn(db->dev, "status check fail: %d\n", rxbyte);   
+            iow(db, DM9000_RCR, 0x00);  /* Stop Device */  
+            iow(db, DM9000_ISR, IMR_PAR);   /* Stop INT request */  
+            return;   
+        }   
+  
+        if (rxbyte != DM9000_PKT_RDY)   
+            return;   
+  
+        /* A packet ready now  & Get status/length */  
+        GoodPacket = true;   
+        writeb(DM9000_MRCMD, db->io_addr);   
+  
+        (db->inblk)(db->io_data, &rxhdr, sizeof(rxhdr));/*一次性读入四个字节的内容到rxhdr变量*/  
+  
+        RxLen = le16_to_cpu(rxhdr.RxLen);   
+  
+        if (netif_msg_rx_status(db))   
+            dev_dbg(db->dev, "RX: status %02x, length %04x\n",   
+                rxhdr.RxStatus, RxLen);   
+  
+        /* Packet Status check */  
+        if (RxLen < 0x40) {   
+            GoodPacket = false;   
+            if (netif_msg_rx_err(db))   
+                dev_dbg(db->dev, "RX: Bad Packet (runt)\n");   
+        }   
+  
+        if (RxLen > DM9000_PKT_MAX) {   
+            dev_dbg(db->dev, "RST: RX Len:%x\n", RxLen);   
+        }   
+  
+        /* rxhdr.RxStatus is identical to RSR register. */  
+        if (rxhdr.RxStatus & (RSR_FOE | RSR_CE | RSR_AE |   
+                      RSR_PLE | RSR_RWTO |   
+                      RSR_LCS | RSR_RF)) {   
+            GoodPacket = false;   
+            if (rxhdr.RxStatus & RSR_FOE) {   
+                if (netif_msg_rx_err(db))   
+                    dev_dbg(db->dev, "fifo error\n");   
+                dev->stats.rx_fifo_errors++;   
+            }   
+            if (rxhdr.RxStatus & RSR_CE) {   
+                if (netif_msg_rx_err(db))   
+                    dev_dbg(db->dev, "crc error\n");   
+                dev->stats.rx_crc_errors++;   
+            }   
+            if (rxhdr.RxStatus & RSR_RF) {   
+                if (netif_msg_rx_err(db))   
+                    dev_dbg(db->dev, "length error\n");   
+                dev->stats.rx_length_errors++;   
+            }   
+        }   
+  
+        /* Move data from DM9000 */  
+                /*关键的代码就是这里啦。使用到了上面提到的sk_buff。将RX SRAM中的data段数据放入sk_buff，然后发送给上层，至于怎么发送，不用去驱动操心了。sk_buff的protocol全部搞定*/  
+        if (GoodPacket   
+            && ((skb = dev_alloc_skb(RxLen + 4)) != NULL)) {   
+            skb_reserve(skb, 2);   
+            rdptr = (u8 *) skb_put(skb, RxLen - 4);   
+  
+            /* Read received packet from RX SRAM */  
+  
+            (db->inblk)(db->io_data, rdptr, RxLen);   
+            dev->stats.rx_bytes += RxLen;   
+  
+            /* Pass to upper layer */  
+            skb->protocol = eth_type_trans(skb, dev);   
+            netif_rx(skb);   
+            dev->stats.rx_packets++;   
+  
+        } else {   
+            /* need to dump the packet's data */  
+  
+            (db->dumpblk)(db->io_data, RxLen);   
+        }   
+    } while (rxbyte == DM9000_PKT_RDY);   
+}  
+6. 中断处理相关函数
+
+   DM9000的驱动程序采用了中断方式而非轮询方式。触发中断的时机发生在：1）DM9000接收到一个包以后。2）DM9000发送完了一个包以后。
+
+   中断处理函数在open的时候被注册进内核。代码清单如下：
+
+static irqreturn_t dm9000_interrupt(int irq, void *dev_id)   
+{   
+    struct net_device *dev = dev_id;   
+    board_info_t *db = netdev_priv(dev);   
+    int int_status;   
+    unsigned long flags;   
+    u8 reg_save;   
+  
+    dm9000_dbg(db, 3, "entering %s\n", __func__);   
+  
+    /* A real interrupt coming */  
+  
+    /* holders of db->lock must always block IRQs */  
+    spin_lock_irqsave(&db->lock, flags);   
+  
+    /* Save previous register address */  
+    reg_save = readb(db->io_addr);   
+  
+    /* Disable all interrupts */  
+    iow(db, DM9000_IMR, IMR_PAR);   
+  
+    /* Got DM9000 interrupt status */  
+    int_status = ior(db, DM9000_ISR);   /* Got ISR */  
+    iow(db, DM9000_ISR, int_status);    /* Clear ISR status */  
+  
+    if (netif_msg_intr(db))   
+        dev_dbg(db->dev, "interrupt status %02x\n", int_status);   
+  
+    /* Received the coming packet */  
+        /*如果是由于收到数据而触发的中断，显然调用dm9000_rx()把数据取走，传递给上层*/  
+    if (int_status & ISR_PRS)   
+        dm9000_rx(dev);   
+  
+    /* Trnasmit Interrupt check */  
+        /*如果是由于发送完了数据而触发的中断，则调用dm9000_tx_done()函数，下面具体分析这个函数*/  
+    if (int_status & ISR_PTS)   
+        dm9000_tx_done(dev, db);   
+  
+    if (db->type != TYPE_DM9000E) {   
+        if (int_status & ISR_LNKCHNG) {   
+            /* fire a link-change request */  
+            schedule_delayed_work(&db->phy_poll, 1);   
+        }   
+    }   
+  
+    /* Re-enable interrupt mask */  
+    iow(db, DM9000_IMR, db->imr_all);   
+  
+    /* Restore previous register address */  
+    writeb(reg_save, db->io_addr);   
+  
+    spin_unlock_irqrestore(&db->lock, flags);   
+  
+    return IRQ_HANDLED;   
+}  
+*dm9000_tx_done()
+
+   注：dm9000可以发送两个数据包，当发送一个数据包产生中断后，要确认一下队列中有没有第2个包需要发送。
+
+
+    （1）读取dm9000寄存器NSR（Network Status Register）获取发送的状态，存在变量tx_status中；
+
+    （2）如果发送状态为NSR_TX2END（第2个包发送完毕）或者NSR_TX1END（第1个包发送完毕），则将待发送的数据包数量（db-> tx_pkt_cnt ）减1，已发送的数据包数量（dev->stats.tx_packets）加1；
+
+    （3）检查变量db-> tx_pkt_cnt（待发送的数据包）是否大于0（表明还有数据包要发送），则调用函数dm9000_send_packet发送队列中的数据包；
+
+    （4）调用函数netif_wake_queue (dev)通知内核可以将待发送的数据包进入发送队列。
+
+/*  
+ * DM9000 interrupt handler  
+ * receive the packet to upper layer, free the transmitted packet  
+ */  
+  
+static void dm9000_tx_done(struct net_device *dev, board_info_t *db)   
+{   
+    int tx_status = ior(db, DM9000_NSR);    /* Got TX status */  
+  
+    if (tx_status & (NSR_TX2END | NSR_TX1END)) {   
+        /* One packet sent complete */  
+        db->tx_pkt_cnt--;   
+        dev->stats.tx_packets++;   
+  
+        if (netif_msg_tx_done(db))   
+            dev_dbg(db->dev, "tx done, NSR %02x\n", tx_status);   
+  
+        /* Queue packet check & send */  
+        if (db->tx_pkt_cnt > 0) {   
+            iow(db, DM9000_TXPLL, db->queue_pkt_len);   
+            iow(db, DM9000_TXPLH, db->queue_pkt_len >> 8);   
+            iow(db, DM9000_TCR, TCR_TXREQ);   
+            dev->trans_start = jiffies;   
+        }   
+        netif_wake_queue(dev);   
+    }   
+}  
+   7. 一些操作硬件细节的函数。
+
+   在看函数之前还是先来看一下DM9000 CMD Pin 和Processor并行总线的连接关系。CMD管脚用来设置命令类型。当CMD管脚拉高时，这个命令周期访问DATA_PORT。 如果拉低， 则这个命令周期访问ADDR_PORT。见下图：
+
+
+
+当然，内存映射的I/O空间读写还是采用最基本的readb(), readw(), readl(), writeb(), writew(), writel() , readsb(), readsw(), readsl(), writesb(), writesw(), writesl() 。
+
+在DM9000的驱动中还自定义了几个函数，方便操作。
+
+     * ior()
+
+        从IO端口读一个字节。代码清单如下：
+
+static u8   
+ior(board_info_t * db, int reg)   
+{   
+    writeb(reg, db->io_addr); /*写reg到ADDR_PORT,用来选择寄存器*/  
+    return readb(db->io_data); /*从DATA_PORT读一个字节，用来读寄存器*/  
+}  
+    * iow()
+
+        向IO端口写一个字节。代码清单如下：
+
+/*  
+ *   Write a byte to I/O port  
+ */  
+  
+static void  
+iow(board_info_t * db, int reg, int value)   
+{   
+    writeb(reg, db->io_addr);   
+    writeb(value, db->io_data);   
+}  
+此外还有dm9000_outblk_8bit(), dm9000_outblk_16bit(), dm9000_outblk_32bit(), dm9000_inblk_8bit(), dm9000_inblk_16bit(), dm9000_inblk_32bit()等等。不一一解释。

@@ -1,0 +1,79 @@
+我们需要编译出运行在ARM平台上的代码，所使用的交叉编译器为 arm-linux-gcc。下面将arm-linux-gcc编译工具的一些常用命令参数介绍给大家。
+在此之前首先介绍下编译器的工作过程，在使用GCC编译程序时，编译过程分为四个阶段：
+1. 预处理（Pre-Processing）
+2. 编译（Compiling）
+3. 汇编（Assembling）
+4. 链接（Linking）
+Linux程序员可以根据自己的需要让 GCC在编译的任何阶段结束，以便检查或使用编译器在该阶段的输出信息，或者对最后生成的二进制文件进行控制，以便通过加入不同数量和种类的调试代码来为 今后的调试做好准备。和其它常用的编译器一样，GCC也提供了灵活而强大的代码优化功能，利用它可以生成执行效率更高的代码。
+以文件example.c为例说明它的用法
+0. arm-linux-gcc -o example example.c
+   不加-c、-S、-E参数，编译器将执行预处理、编译、汇编、连接操作直接生成可执行代码。
+    -o参数用于指定输出的文件，输出文件名为example,如果不指定输出文件，则默认输出a.out
+
+1. arm-linux-gcc -c -o example.o example.c
+   -c参数将对源程序example.c进行预处理、编译、汇编操作，生成example.0文件
+   去掉指定输出选项"-o example.o"自动输出为example.o,所以说在这里-o加不加都可以
+
+2.arm-linux-gcc -S -o example.s example.c
+   -S参数将对源程序example.c进行预处理、编译，生成example.s文件
+   -o选项同上
+
+3.arm-linux-gcc -E -o example.i example.c
+   -E参数将对源程序example.c进行预处理，生成example.i文件（不同版本不一样，有的将预处理后的内容打印到屏幕上）
+   就是将#include，#define等进行文件插入及宏扩展等操作。
+  
+4.arm-linux-gcc -v -o example example.c
+加上-v参数，显示编译时的详细信息，编译器的版本，编译过程等。
+
+5.arm-linux-gcc -g -o example example.c
+-g选项，加入GDB能够使用的调试信息,使用GDB调试时比较方便。
+
+6.arm-linux-gcc -Wall -o example example.c
+-Wall选项打开了所有需要注意的警告信息，像在声明之前就使用的函数，声明后却没有使用的变量等。
+
+7.arm-linux-gcc -Ox -o example example.c
+-Ox使用优化选项，X的值为空、0、1、2、3
+0为不优化，优化的目的是减少代码空间和提高执行效率等，但相应的编译过程时间将较长并占用较大的内存空间。
+
+8.arm-linux-gcc   -I /home/include -o example example.c
+-Idirname: 将dirname所指出的目录加入到程序头文件目录列表中。如果在预设系统及当前目录中没有找到需要的文件，就到指定的dirname目录中去寻找。
+
+9.arm-linux-gcc   -L /home/lib -o example example.c
+
+-Ldirname：将dirname所指出的目录加入到库文件的目录列表中。在默认状态下，连接程序ld在系统的预设路径中(如/usr/lib)寻找所需要的库文件，这个选项告诉连接程序，首先到-L指定的目录中去寻找，然后再到系统预设路径中寻找。
+
+10.arm-linux-gcc –static -o libexample.a example.c
+
+静态链接库文件
+
+ 
+
+gcc在命令行上经常使用的几个选项是：
+-c   只预处理、编译和汇编源程序，不进行连接。编译器对每一个源程序产生一个目标文件。
+
+-o file  确定输出文件为file。如果没有用-o选项，缺省的可执行文件的输出是a.out，目标文件和汇编文件的输出对source.suffix分别是source.o和source.s，预处理的C源程序的输出是标准输出stdout。
+
+-Dmacro 或-Dmacro=defn   其作用类似于源程序里的#define。例如：% gcc -c -DHAVE_GDBM -DHELP_FILE="help" cdict.c其中第一个- D选项定义宏HAVE_GDBM，在程序里可以用#ifdef去检查它是否被设置。第二个-D选项将宏HELP_FILE定义为字符串“help”（由于 反斜线的作用，引号实际上已成为该宏定义的一部分），这对于控制程序打开哪个文件是很有用的。
+
+-Umacro   某些宏是被编译程序自动定义的。这些宏通常可以指定在其中进行编译的计算机系统类型的符号，用户可以在编译某程序时加上 -v选项以查看gcc缺省定义了哪些宏。如果用户想取消其中某个宏定义，用-Umacro选项，这相当于把#undef macro放在要编译的源文件的开头。
+
+-Idir   将dir目录加到搜寻头文件的目录列表中去，并优先于在gcc缺省的搜索目录。在有多个-I选项的情况下，按命令行上-I选项的前后顺序搜索。dir可使用相对路径，如-I../inc等。
+
+-O   对程序编译进行优化，编译程序试图减少被编译程序的长度和执行时间，但其编译速度比不做优化慢，而且要求较多的内存。
+
+-O2   允许比-O更好的优化，编译速度较慢，但结果程序的执行速度较快。
+
+-g   产生一张用于调试和排错的扩展符号表。-g选项使程序可以用GNU的调试程序GDB进行调试。优化和调试通常不兼容，同时使用-g和-O（-O2）选项经常会使程序产生奇怪的运行结果。所以不要同时使用-g和-O（-O2）选项。
+
+-fpic或-fPIC   产生位置无关的目标代码，可用于构造共享函数库。
+
+以 上是gcc的编译选项。gcc的命令行上还可以使用连接选项。事实上，gcc将所有不能识别的选项传递给连接程序ld。连接程序ld将几个目标文件和库程 序组合成一个可执行文件，它要解决对外部变量、外部过程、库程序等的引用。但我们永远不必要显式地调用ld。利用gcc命令去连接各个文件是很简单的，即 使在命令行里没有列出库程序，gcc也能保证某些库程序以正确的次序出现。
+
+gcc的常用连接选项有下列几个：
+-Ldir   将dir目录加到搜寻-l选项指定的函数库文件的目录列表中去，并优先于gcc缺省的搜索目录。在有多个-L选项的情况下，按命令行上-L选项的前后顺序搜索。dir可使用相对路径。如-L../lib等。
+
+-lname   在连接时使用函数库libname.a，连接程序在-Ldir选项指定的目录下和/lib，/usr/lib目录下寻找该库文件。在没有使用-static选项时，如果发现共享函数库libname.so，则使用libname.so进行动态连接。
+
+-static   禁止与共享函数库连接。
+
+-shared   尽量与共享函数库连接

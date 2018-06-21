@@ -1,0 +1,102 @@
+ucos-III 学习笔记
+
+第二章：移植uc/os到stm32
+	官网下载st对应的版本
+	新建文件夹（不是一定的）：app（配置、钩子函数等）、BSP（bsp.c、bsp.h）、uC-CPU（cpu相关）、uC-LIB（库相关）、uCOS-III（uCOS-III）
+	新建工程文件
+	修改启动文件：start_stm32f429_439xx.s-{PendSV_Handler改为OS_CPU_PendSV_Handler，SysTick_Handler改为OS_CPU_SysTick_Handler（有两个地方：一个定义，一个声明外部）}
+	bsp.h头文件里面的内容改一下
+	app_cfg.h 更改优先级
+第三章：时钟节拍
+	是ucos操作系统的心脏，它不跳动系统就瘫痪了。时钟节拍是操作系统的时基，时间上的管理必须依赖时基。
+	OS_CFG_TICK_RATE_HZ 定义在os_cfg_app.h
+	OS_CPU_SysInit() 定义在os_cpu_c.c
+	OS_CPU_SysTickHandler (void) 定义在os_cpu_c.c
+	OSTimeTick (void) 定义在os_time.c
+	
+第四章： 时间管理
+	建立在时钟节拍上
+	1、OSTimeDly(OS_TICK dly, OS_OPT opt, OS_ERR *p_err)
+	2、OSTimeDlyHMSM(CPU_INT16U hours,CPU_INT16U minutes, CPU_INT16U seconds, CPU_INT32U milli, OS_OPT opt, OS_ERR *p_err)
+	3、OSTimeDlyResume(OS_TCB *p_tcb, OS_ERR *p_err) :结束其他任务的延时
+	4、OSTimeGet(OS_ERR *p_err) : 获取当前时钟节拍计数值
+	5、OSTimeSet(OS_TICK ticks, OS_ERR *p_err) : 设置当前时钟节拍计数值
+	
+第五章：软件定时器
+	基于时钟节拍和系统管理，软件计时器任务OS_TmrTask()统一管理。
+	1、OSTmrCreate(OS_TMR *p_tmr, CPU_CHAR *p_name, OS_TICK dly,OS_TICK period, OS_OPT opt, OS_TMR_CALLBACK_PTR p_callback,void *p_callback_arg,OS_ERR *p_err): 创建一个软件计时器
+	2、OSTmrStart(OS_TMR *p_tmr, OS_ERR *p_err): 启动软件定时器
+	3、OSTmrStop(OS_TMR *p_tmr, OS_OPT *opt, void *p_callback_arg, OS_ERR *p_err):停止软件定时器
+	4、OSTmrDel(OS_TMR *p_tmr, OS_ERR *p_err):删除一个软件定时器
+第六章：多值信号量
+	用于标志事件的发生和共享资源管理
+	1、OSSemCreate(OS_SEM *p_sem, CPU_CHAR *p_name, OS_SEM_CTR cnt, OS_ERR *p_err): 创建多值信号量
+	2、OSSemPost(OS_SEM *p_sem, OS_OPT opt, OS_ERR *p_err): 发布多值信号量
+	3、OSSemPend(OS_SEM *p_sem, OS_TICK timeout, OS_OPT opt, CPU_TS *p_ts, OS_ERR *p_err) : 等待一个多值信号
+	4、OSSemPendAbort(): 中止任务对一个多值信号量的等待
+	5、OSSemDel() : 删除一个多值信号量
+	6、OSSemSet()： 设置多值信号量的计数值
+第七章：互斥信号量
+	与多值类似，但是它是二值的，只能是0或1，主要用于保护资源
+	1、OSMutexCreate():创建互斥信号量
+	2、OSMutexPost(): 发布（释放、提交）互斥信号量
+	3、OSMutexPend():申请（等待、请求）获取一个互斥信号量
+	4、OSMutexPendAbort():中止一个任务对一个互斥信号量的等待
+	5、OSMutexDel():删除一个互斥信号量
+第八章：消息队列
+	
+	OSQCreate()
+	OSQPost()
+	OSQPend()
+	OSQPendAbort()
+	OSQDel()
+	OSQFlush()
+第九章：事件标志组
+	
+	OSFlagCreate()
+	OSFlagPost()
+	OSFlagPend()
+	OSFlagPendAbort()
+	OSFlagDel()
+第十章：等待多个内核对象
+	
+	OSPendMulti()
+第十一章：任务信号量
+	OSTaskSemPost()
+	OSTaskSemPend()
+	OSTaskSemPendAbort()
+第十二章：任务消息队列
+	OSTaskQPost()
+	OSTaskQPend()
+	OSTaskQPendAbort()
+第十三章：内存管理
+	
+	OSMemCreate()
+	OSMemGet()
+	OSMemPut()
+第十四章：任务管理
+	
+	OSTaskCreate()
+	OSTaskSuspend()
+	OSTaskResume()
+	OSTaskChangePrio()
+	OSTaskDel()
+	OSSchedRoundRobinCfg()
+	OSSchedRoundRobinYield()
+	OSTaskTimeQuantaSet()
+	OSTaskRegSet()
+	OSTaskRegGet()
+第十五章：中断管理
+	中断任务相当于最高优先级的任务，中断一般处理比较急的事件，而且只做简单的事件，待退出中断后再详细处理，基于此，一般在中断中发信号量、消息等事件标志，等退出后再在相应的任务中详细处理
+	OSIntEnter()
+	OSIntExit()
+	CPU_IntDisMeasMaxGet() ：测量整个程序最大关中断时间
+	CPU_IntDisMeasMaxCurReset() ： 测量某程序段运行过程中的最大关中断时间
+	CPU_IntDisMeasMaxCurGet()
+	
+第十六章：统计信息
+	
+	统计任务：uc/os系统为用户提供一个统计任务，用于统计cpu使用率和任务堆栈的用量。
+	CPU主频：使用BSP_CPU_ClkFreq()函数可以返回CPU的工作频率(HZ)，时间戳就是以这个频率计数的，用户在将时间戳转换成国际单位时，需要除以这个频率。
+	uC/OS版本号：使用OSVersion()函数可以获取uC/OS系统的版本号，版本格式为Vx.yy.zz，返回的版本号是一个被去掉‘.’符号的整数。
+	其他统计信息：最大关中断时间，任务切换总数OSTaskCtxSwCtr，被创建的任务数OSTaskQty，调度器被锁的最大时间OSSchedLockTimeMax()，中断队列成员被使用的最大数目OSIntQNbrEntriesMax，事件标志组对象的数目OSFlagQty，内存管理对象的数目OSMemQty，互斥信号量对象的数目OSMutexQty，消息队列对象的数目OSQQty，多值信号量对象的数目OSSemQty。

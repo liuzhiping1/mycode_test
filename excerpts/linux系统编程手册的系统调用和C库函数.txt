@@ -1,0 +1,66 @@
+第4章：文件I/O：通用IO模型：open()/creat()/read()/write()/close()/ioctl()/lseek()
+第5章：深入探究文件I/O  ：fcntl()/pread()/pwrite()/readv()/writev()/truncate()/ftruncate()
+第6章：进程 ：进程内存布局：文本（程序段）->初始化数据段->未初始化数据段->堆->未分配内存->栈->argv,environ->kernel 。getpid()/getppid()/getenv()/putenv()/setenv()/unsetenv()/clearenv()/setjmp()/longjmp()/
+第7章：内存分配：brk()/sbrk()/malloc()/free()/alloca()/mtrace()/muntrace()/mcheck()/mprobe()/calloc()/realloc()/
+第8章：用户和组：用户ID和组ID/密码文件/etc/passwd 组文件/etc/group. getpwnam()/getpwuid()/getgrnam()/getgrgid()/setpwent()/endpwent()/getspnam()/getspent()/setspent()/endspent()/crypt()
+第9章：进程凭证：实际用户ID/有效用户ID/保存的set-user-ID, getuid()/geteuid()/getgid()/getegid()/setuid()/setgid()/seteuid()/setegid()/setreuid()/setregid()/setfsuid()/setfsgid()/getgroups()/setgroups()/initgroups()
+第10章：时间：gettimeofday()/time()/ctime()/gmtime()/localtime()/mktime()/asctime()/strftime()/currtime()/setlocale()/settimeofday()/adjtime()
+第11章：系统限制和选项：sysconf()/pathconf()/fpathconf()
+第12章：系统和进程信息 ：uname()
+第13章：文件I/O缓冲：setvbuf()/fflush()/fsync()/posix_fadvise()/fileno()/fdopen()
+第14章：系统编程概念：mount()/umount()/umount2()/statvfs()/
+第15章：文件属性：stat()/lstat()/fstat()/utime()/utimes()/utimensat()/futimens()/chown()/lchown()/fchown()/access()/umask()/fchmod()/chmod()/
+第16章：扩展属性：setxattr()/lsetxattr()/fsetxattr()/getxattr()/lgetxattr()/fgetxattr()/removexattr()/lremovexattr()/fremoveattr()/listxattr()/llistxattr()/flistxattr()
+第17章：访问控制列表：acl_get_file()/acl_get_entry()/acl_get_tag_type()/acl_get_qualifier()/acl_set_qualifier()/acl_get_perm()/acl_add_perm()/acl_delete_perm()/acl_clear_perm()/acl_creat_entry()/acl_delete_entry()/acl_from_text()/acl_to_text()
+第18章：目录与链接：link()/unlink()/rename()/symlink()/readlink()/mkdir()/rmdir()/remove()/opendir()/readdir()/fdopendir()/rewinddir()/closedir()/dirfd()/nftw()/getcwd()/chdir()/fchdir()/chroot()/realpath()/dirname()/basename()
+第19章：监控文件事件： inotify_init()/inotify_add_watch()/inotify_rm_watch()
+第20章：信号：基本概念： signal()/kill()/raise()/killpg()/strsignal()/psignal()/sigemptyset()/sigfillset()/sigaddset()/sigdelset()/sigismember()/sigandset()/sigorset()/sigisemptyset()/sigpending()/sigaction()/pause()/
+第21章：信号：信号处理函数 :sigsetjmp()/siglongjmp()/abort()/sigaltstack()/
+第22章：信号：高级特性 : sigqueue()/sigsuspend()/sigwaitinfo()/sigtimedwait()/signalfd()/sigset()/sigblock()/sigsetmask()/sigpause()/sigmask()
+第23章：定时器与休眠: setitimer()/getitimer()/alarm()/sleep()/nanosleep()/clock_getres()/clock_gettime()/clock_settime()/clock_getcpuclockid()/pthread_getcpuclockid()/clock_nanosleep()/timer_create()/timer_settime()/timer_gettime()/timer_delete()/timer_getoverrun()/timerfd_create()/timerfd_settime()/timer_gettime()/
+第24章：进程的创建: fork()/vfork()/exit()/wait()/execve()
+第25章：进程的终止: _exit()/exit()/atexit()/on_exit()/
+第26章：监控子进程: wait()/waitpid()/waitid()/wait3()/wait4()/
+第27章：程序的运行:execve()/execle()/execlp()/execvp()/execv()/execl()/system()/
+第28章：详述进程创建和程序运行:acct()/clone()
+第29章：线程：介绍: pthread_create()/pthread_exit()/pthread_self()/pthread_equal()/pthread_join()/pthread_detach()/
+第30章：线程：线程同步 : pthread_mutex_lock()/pthread_mutex_unlock()/pthread_mutex_init()/pthread_cond_signal()/pthread_cond_broadcast()/pthread_cond_wait()/pthread_cond_timedwait()/pthread_cond_init()/pthread_cond_destroy()
+第31章：线程：线程安全和每线程存储 : pthread_once()/pthread_key_create()/pthread_setspecific()/pthread_getspecific()/
+第32章：线程：线程取消 : pthread_cancel()/pthread_setcancelstate()/pthread_setcanceltype()/pthread_testcancel()/pthread_cleanup_push()/pthread_cleanup_pop()/
+第33章：线程：更多细节 : pthread_kill()/pthread_sigmask()/pthread_sigqueue()/sigwait()
+第34章：进程组、会话和作业控制 : getpgrp()/setpgrp()/getsid()/setsid()/ctermid()/tcgetpgrp()/
+第35章：进程优先级和调度 : getpriority()/setpriority()/sched_get_priority_min()/sched_get_priority_max()/sched_setscheduler()/sched_setparam()/sched_getscheduler()/sched_getparam()/sched_yield()/sched_rr_get_interval()/sched_setaffinity()/sched_getaffinity()
+第36章：进程资源 : getrusage()/getrlimit()/setrlimit()
+第37章：DAEMON  : becomeDaemon()/setlogmask()/
+第38章：编写安全的特权程序 : 
+第39章：能力 : 
+第40章：登录记账 : setutxent()/endutxent()/getutxent()/getutxid()/getutxline()/utmpxname()/getlogin()/pututxline()/updwtmpx()/
+第41章：共享库基础: ar,gcc,ld,ldconfig,dlopen,objdump,readelf,
+第42章：共享库高级特性 : dlopen()/dlerror()/dlsym()/dlclose()/dladdr()/
+第43章：进程间通信简介
+第44章：管道和FIFO : pipe()/popen()/pclose()/mkfifo
+第45章：system V IPC介绍 : ftok()/
+第46章：system V 消息队列 : msgget()/msgsnd()/msgrcv()/msgctl()/
+第47章：system V 信号量 : semget()/semctl()/semop()/semtimedop()/
+第48章：system V 共享内存 : shmget()/shmat()/shmdt()/
+第49章：内存映射 mmap()/munmap()/msync()/mremap()/remap_file_pages()/
+第50章：虚拟内存操作 : mprotect()/mlock()/mlockatt()/munlock()/mlockall()/munlockall()/mincore()/madvise
+第51章：POSIX IPC介绍 
+第52章：POSIX IPC消息介绍 : mq_open()/mq_close()/mq_unlink()/mq_send()/mq_receive()/mq_notify()
+第53章：POSIX IPC信号量 : sem_open()/sem_close()/sem_unlink()/sem_wait()/sem_trywait()/sem_timedwait()/sem_post()/sem_getvalue()/sem_init()/sem_destroy()/
+第54章：POSIX IPC共享内存 : shm_open()/shm_unlink()/
+第55章：文件加锁 : flock()/
+第56章：SOCKET ： 介绍 : 
+第57章：SOCKET：UNIX DOMAIN : socket()/bind()/listen()/accept()/connect()/recvfrom()/sendto()/socketpair()
+第58章：SOCKET：TCP/IP网络基础 :
+第59章：SOCKET：Internet DOMAIIN :htons()/htonl()/ntohl()/ntohs()/readline()/inet_pton()/inet_ntop()/getaddrinfo()/freeaddrinfo()/gai_strerror()/getnameinfo()/inetConnect()/inetListen()/inetBind()/inetAddressStr()/inet_aton()/inet_ntoa()/gethostbyname()/gethostbyaddr()/herror()/getservbyname()/getservbyport()/
+第60章：SOCKET：服务器设计
+第61章：SOCKET：高级主题
+第62章：终端 : tcgetattr()/tcsetattr()/tcsendbreak()/tcdrain()/tcflush()/tcflow()/isatty()/ttyname()/
+第63章：其他备选的IO模型 : select()/poll()/epoll_create()/epoll_ctl()/epoll_wait()/pselect()/
+第64章：伪终端 : posix_openpt()/grantpt()/unlockpt()/ptsname()/ptyMasterOpen()/ptyFork()/
+附录A 跟踪系统调用
+附录B 解析命令行选项 : getopt()
+附录C 对NULL指针做转型
+附录D 内核 配置
+附录E 更多信息源

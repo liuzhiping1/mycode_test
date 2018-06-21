@@ -138,3 +138,9 @@ nexti   ni
 stepi   si
 delete  d
 print   p
+
+20 多线程 https://www.cnblogs.com/jianyungsun/p/8085153.html
+1. 默认设置下，在调试多进程程序时GDB只会调试主进程。但是GDB（>V7.0）支持多进程的分别以及同时调试，换句话说，GDB可以同时调试多个程序。只需要设置follow-fork-mode(默认值：parent)和detach-on-fork（默认值：on）即可。
+2. GDB默认支持调试多线程，跟主线程，子线程block在create thread。
+   查询线程：info threads
+   切换调试线程：thread <thread number>

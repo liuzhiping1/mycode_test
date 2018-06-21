@@ -1,0 +1,180 @@
+automake.info Makefile.in
+root# info automake 
+
+'autoreconf' is a script that calls 'autoconf', 'automake', and a
+bunch of other commands in the right order.  If you are beginning with
+these tools, it is not important to figure out in which order all of
+these tools should be invoked and why.  However, because Autoconf and
+Automake have separate manuals, the important point to understand is
+that 'autoconf' is in charge of creating 'configure' from
+'configure.ac', while 'automake' is in charge of creating 'Makefile.in's
+from 'Makefile.am's and 'configure.ac'.  This should at least direct you
+to the right manual when seeking answers.
+
+ The 'bin' part of the 'bin_PROGRAMS' tells 'automake' that the
+resulting programs should be installed in BINDIR.  Recall that the GNU
+Build System uses a set of variables to denote destination directories
+and allow users to customize these locations (*note Standard Directory
+Variables::).  Any such directory variable can be put in front of a
+primary (omitting the 'dir' suffix) to tell 'automake' where to install
+the listed files.
+
+ Programs need to be built from source files, so for each program
+'PROG' listed in a '_PROGRAMS' variable, 'automake' will look for
+another variable named 'PROG_SOURCES' listing its source files.  There
+may be more than one source file: they will all be compiled and linked
+together.
+
+ Automake also knows that source files need to be distributed when
+creating a tarball (unlike built programs).  So a side-effect of this
+'hello_SOURCES' declaration is that 'main.c' will be part of the tarball
+created by 'make dist'.
+
+Finally here are some explanations regarding the top-level
+'Makefile.am'.
+
+     SUBDIRS = src
+     dist_doc_DATA = README
+
+   'SUBDIRS' is a special variable listing all directories that 'make'
+should recurse into before processing the current directory.  So this
+line is responsible for 'make' building 'src/hello' even though we run
+it from the top-level.  This line also causes 'make install' to install
+'src/hello' before installing 'README' (not that this order matters).
+
+   The line 'dist_doc_DATA = README' causes 'README' to be distributed
+and installed in DOCDIR.  Files listed with the '_DATA' primary are not
+automatically part of the tarball built with 'make dist', so we add the
+'dist_' prefix so they get distributed.  However, for 'README' it would
+not have been necessary: 'automake' automatically distributes any
+'README' file it encounters (the list of other files automatically
+distributed is presented by 'automake --help').  The only important
+effect of this second line is therefore to install 'README' during 'make
+install'.
+
+Automake works by reading a 'Makefile.am' and generating a
+'Makefile.in'.
+
+3.7 Programs automake might require
+===================================
+
+Automake sometimes requires helper programs so that the generated
+'Makefile' can do its work properly.  There are a fairly large number of
+them, and we list them here.
+
+   Although all of these files are distributed and installed with
+Automake, a couple of them are maintained separately.  The Automake
+copies are updated before each release, but we mention the original
+source in case you need more recent versions.
+
+'ar-lib'
+     This is a wrapper primarily for the Microsoft lib archiver, to make
+     it more POSIX-like.
+
+'compile'
+     This is a wrapper for compilers that do not accept options '-c' and
+     '-o' at the same time.  It is only used when absolutely required.
+     Such compilers are rare, with the Microsoft C/C++ Compiler as the
+     most notable exception.  This wrapper also makes the following
+     common options available for that compiler, while performing file
+     name translation where needed: '-I', '-L', '-l', '-Wl,' and
+     '-Xlinker'.
+
+'config.guess'
+'config.sub'
+     These two programs compute the canonical triplets for the given
+     build, host, or target architecture.  These programs are updated
+     regularly to support new architectures and fix probes broken by
+     changes in new kernel versions.  Each new release of Automake comes
+     with up-to-date copies of these programs.  If your copy of Automake
+     is getting old, you are encouraged to fetch the latest versions of
+     these files from <http://savannah.gnu.org/git/?group=config> before
+     making a release.
+
+'depcomp'
+     This program understands how to run a compiler so that it will
+     generate not only the desired output but also dependency
+     information that is then used by the automatic dependency tracking
+     feature (*note Dependencies::).
+
+'install-sh'
+     This is a replacement for the 'install' program that works on
+     platforms where 'install' is unavailable or unusable.
+'mdate-sh'
+     This script is used to generate a 'version.texi' file.  It examines
+     a file and prints some date information about it.
+
+'missing'
+     This wraps a number of programs that are typically only required by
+     maintainers.  If the program in question doesn't exist, or seems to
+     old, 'missing' will print an informative warning before failing
+     out, to provide the user with more context and information.
+
+'mkinstalldirs'
+     This script used to be a wrapper around 'mkdir -p', which is not
+     portable.  Now we prefer to use 'install-sh -d' when 'configure'
+     finds that 'mkdir -p' does not work, this makes one less script to
+     distribute.
+
+     For backward compatibility 'mkinstalldirs' is still used and
+     distributed when 'automake' finds it in a package.  But it is no
+     longer installed automatically, and it should be safe to remove it.
+
+'py-compile'
+     This is used to byte-compile Python scripts.
+
+'test-driver'
+     This implements the default test driver offered by the parallel
+     testsuite harness.
+
+'texinfo.tex'
+     Not a program, this file is required for 'make dvi', 'make ps' and
+     'make pdf' to work when Texinfo sources are in the package.  The
+     latest version can be downloaded from
+     <http://www.gnu.org/software/texinfo/>.
+
+	 
+===========================================================
+4.1 A simple example, start to finish
+=====================================
+
+Let's suppose you just finished writing 'zardoz', a program to make your
+head float from vortex to vortex.  You've been using Autoconf to provide
+a portability framework, but your 'Makefile.in's have been ad-hoc.  You
+want to make them bulletproof, so you turn to Automake.
+
+   The first step is to update your 'configure.ac' to include the
+commands that 'automake' needs.  The way to do this is to add an
+'AM_INIT_AUTOMAKE' call just after 'AC_INIT':
+
+     AC_INIT([zardoz], [1.0])
+     AM_INIT_AUTOMAKE
+     ...
+
+   Since your program doesn't have any complicating factors (e.g., it
+doesn't use 'gettext', it doesn't want to build a shared library),
+you're done with this part.  That was easy!
+
+   Now you must regenerate 'configure'.  But to do that, you'll need to
+tell 'autoconf' how to find the new macro you've used.  The easiest way
+to do this is to use the 'aclocal' program to generate your 'aclocal.m4'
+for you.  But wait... maybe you already have an 'aclocal.m4', because
+you had to write some hairy macros for your program.  The 'aclocal'
+program lets you put your own macros into 'acinclude.m4', so simply
+rename and then run:
+
+     mv aclocal.m4 acinclude.m4
+     aclocal
+     autoconf
+
+   Now it is time to write your 'Makefile.am' for 'zardoz'.  Since
+'zardoz' is a user program, you want to install it where the rest of the
+user programs go: 'bindir'.  Additionally, 'zardoz' has some Texinfo
+documentation.  Your 'configure.ac' script uses 'AC_REPLACE_FUNCS', so
+you need to link against '$(LIBOBJS)'.  So here's what you'd write:
+
+     bin_PROGRAMS = zardoz
+     zardoz_SOURCES = main.c head.c float.c vortex9.c gun.c
+     zardoz_LDADD = $(LIBOBJS)
+
+     info_TEXINFOS = zardoz.texi
